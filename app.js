@@ -198,8 +198,10 @@ function saveLogs() {
 
 // 特定の日付のデータがない場合は初期データを作成
 function initDateDataIfNeeded(dateStr) {
+  let isNewDate = false;
   if (!state.reservations[dateStr]) {
     state.reservations[dateStr] = {};
+    isNewDate = true;
   }
   
   DEFAULT_ROOMS.forEach(room => {
@@ -215,6 +217,41 @@ function initDateDataIfNeeded(dateStr) {
       });
     }
   });
+
+  // デモンストレーション用初期データのシード (新規日付作成時のみ適用)
+  if (isNewDate) {
+    // 1. 和室: 午前枠 (マイクなし・小音量)
+    state.reservations[dateStr]["和室"]["morning"].reserved = true;
+    
+    // 2. 会議室5: 午前枠 (マイクなし・小音量), 午後枠 (マイクなし)
+    state.reservations[dateStr]["会議室5"]["morning"].reserved = true;
+    state.reservations[dateStr]["会議室5"]["afternoon"].reserved = true;
+    
+    // 3. 実習室1: 午前枠 (マイクあり・大音量), 午後枠 (マイクあり)
+    state.reservations[dateStr]["実習室1"]["morning"].reserved = true;
+    state.reservations[dateStr]["実習室1"]["morning"].useMic = true;
+    state.reservations[dateStr]["実習室1"]["afternoon"].reserved = true;
+    state.reservations[dateStr]["実習室1"]["afternoon"].useMic = true;
+    
+    // 4. 研修室: 午後枠 (マイクあり・大音量), 夜間枠 (マイクあり)
+    state.reservations[dateStr]["研修室"]["afternoon"].reserved = true;
+    state.reservations[dateStr]["研修室"]["afternoon"].useMic = true;
+    state.reservations[dateStr]["研修室"]["night"].reserved = true;
+    state.reservations[dateStr]["研修室"]["night"].useMic = true;
+    
+    // 5. 視聴覚室: 午後枠 (マイクあり・大音量), 夜間枠 (マイクなし)
+    state.reservations[dateStr]["視聴覚室"]["afternoon"].reserved = true;
+    state.reservations[dateStr]["視聴覚室"]["afternoon"].useMic = true;
+    state.reservations[dateStr]["視聴覚室"]["night"].reserved = true;
+    
+    // 6. 会議室1: 午後枠 (マイクなし・小音量)
+    state.reservations[dateStr]["会議室1"]["afternoon"].reserved = true;
+    
+    // 7. 会議室3: 夜間枠 (マイクなし・小音量)
+    state.reservations[dateStr]["会議室3"]["night"].reserved = true;
+    
+    saveReservations(); // シードしたデータをlocalStorageに即時保存
+  }
 }
 
 // 日付フォーマットヘルパー (YYYY-MM-DD)
