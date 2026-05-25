@@ -51,8 +51,8 @@ let state = {
   currentDate: "",          // "YYYY-MM-DD" フォーマット
   reservations: {},         // { "YYYY-MM-DD": { "部屋名": { "slotId": { reserved: bool, play10: bool, play1: bool, useMic: bool } } } }
   isSystemActivated: true,  // ブラウザ音声アンロック状態（初期状態で強制オン）
-  volumeMic: 0.9,           // マイク使用時の大音量
-  volumeNoMic: 0.4,         // マイク非使用時の小音量
+  volumeMic: 75,            // マイク使用時の音量 (75dB)
+  volumeNoMic: 70,          // マイク非使用時の音量 (70dB)
   logs: []
 };
 
@@ -167,13 +167,15 @@ function loadFromLocalStorage() {
   
   const savedVolumeMic = localStorage.getItem("signsound_volume_mic");
   if (savedVolumeMic !== null) {
-    state.volumeMic = parseFloat(savedVolumeMic);
+    const val = parseFloat(savedVolumeMic);
+    state.volumeMic = val <= 1.0 ? 75 : val;
   }
   document.getElementById("volumeSliderMic").value = state.volumeMic;
 
   const savedVolumeNoMic = localStorage.getItem("signsound_volume_nomic");
   if (savedVolumeNoMic !== null) {
-    state.volumeNoMic = parseFloat(savedVolumeNoMic);
+    const val = parseFloat(savedVolumeNoMic);
+    state.volumeNoMic = val <= 1.0 ? 70 : val;
   }
   document.getElementById("volumeSliderNoMic").value = state.volumeNoMic;
   
@@ -366,8 +368,8 @@ function renderScheduleGrid() {
         saveReservations();
         renderScheduleGrid();
         renderFloorMap();
-        const volPercent = Math.round((slotData.useMic ? state.volumeMic : state.volumeNoMic) * 100);
-        addLog("sys", `【設定変更】${room} ${slot.name} の「マイク使用（音量大:${volPercent}%）」を ${slotData.useMic ? 'ON' : 'OFF'} にしました。`);
+        const volDb = slotData.useMic ? state.volumeMic : state.volumeNoMic;
+        addLog("sys", `【設定変更】${room} ${slot.name} の「マイク使用（音量大:${volDb}dB）」を ${slotData.useMic ? 'ON' : 'OFF'} にしました。`);
       });
       labelMic.appendChild(chkMic);
       labelMic.appendChild(document.createTextNode(" 🎤 マイク使用 (大)"));
@@ -653,8 +655,8 @@ function updatePopoverStatusDisplay(isReserved) {
 }
 
 function updateVolumeDisplay() {
-  document.getElementById("volumeValueMic").innerText = `${Math.round(state.volumeMic * 100)}%`;
-  document.getElementById("volumeValueNoMic").innerText = `${Math.round(state.volumeNoMic * 100)}%`;
+  document.getElementById("volumeValueMic").innerText = `${state.volumeMic}dB`;
+  document.getElementById("volumeValueNoMic").innerText = `${state.volumeNoMic}dB`;
 }
 
 // 6. 音響エンジン (Audio Engine)
@@ -721,6 +723,13 @@ function activateSystemAutomatically() {
   }
 }
 
+// dB値をHTML5 Audioのリニア音量(0.0〜1.0)に変換するヘルパー
+function dbToLinearVolume(db) {
+  if (db <= 50) return 0.0;
+  if (db >= 90) return 1.0;
+  return (db - 50) / 40;
+}
+
 // チャイム再生
 function playChime(type, roomName = "テスト", slotName = "手動", forceVolume = null) {
   if (!state.isSystemActivated) {
@@ -746,7 +755,7 @@ function playChime(type, roomName = "テスト", slotName = "手動", forceVolum
     }
   }
   
-  audio.volume = volumeToUse;
+  audio.volume = dbToLinearVolume(volumeToUse);
   audio.currentTime = 0;
   
   // 手動テスト再生ボタンの光るアニメーション設定
@@ -852,8 +861,8 @@ function checkBroadcastTriggers() {
       if (!slotData || !slotData.reserved) return;
       
       const isMicUsed = slotData.useMic || false;
-      const volPercent = Math.round((isMicUsed ? state.volumeMic : state.volumeNoMic) * 100);
-      const micText = isMicUsed ? `🎤マイク使用中・音量大:${volPercent}%` : `🔇マイク非使用・音量小:${volPercent}%`;
+      const volDb = isMicUsed ? state.volumeMic : state.volumeNoMic;
+      const micText = isMicUsed ? `🎤マイク使用中・音量大:${volDb}dB` : `🔇マイク非使用・音量小:${volDb}dB`;
       
       // 10分前放送のチェック (終了時刻の10分前)
       const trigger10Min = slot.endMin - 10;
@@ -1177,8 +1186,8 @@ function registerEventListeners() {
     renderScheduleGrid();
     renderFloorMap();
     const slotStr = TIME_SLOTS.find(s => s.id === currentMapSlot).name;
-    const volPercent = Math.round((slotData.useMic ? state.volumeMic : state.volumeNoMic) * 100);
-    addLog("sys", `【案内図操作】${activePopoverRoom} ${slotStr} の「マイク使用（音量大:${volPercent}%）」を ${slotData.useMic ? 'ON' : 'OFF'} にしました。`);
+    const volDb = slotData.useMic ? state.volumeMic : state.volumeNoMic;
+    addLog("sys", `【案内図操作】${activePopoverRoom} ${slotStr} の「マイク使用（音量大:${volDb}dB）」を ${slotData.useMic ? 'ON' : 'OFF'} にしました。`);
   });
 
   // ポップオーバー手動テスト再生
@@ -1189,8 +1198,8 @@ function registerEventListeners() {
     const volToUse = slotData.reserved && slotData.useMic ? state.volumeMic : state.volumeNoMic;
     
     playChime("10min", "テスト", "手動", volToUse);
-    const volPercent = Math.round(volToUse * 100);
-    addLog("manual", `「手動テスト再生（${activePopoverRoom}基準・音量:${volPercent}%）」を実行しました。`);
+    const volDb = volToUse;
+    addLog("manual", `「手動テスト再生（${activePopoverRoom}基準・音量:${volDb}dB）」を実行しました。`);
   });
   
   // マイク使用時のボリュームスライダー変更
@@ -1218,27 +1227,27 @@ function registerEventListeners() {
   // 手動テスト再生（マイク使用あり・音量大）
   document.getElementById("btnTest10MinMic").addEventListener("click", () => {
     playChime("10min", "テスト", "手動", state.volumeMic);
-    const volPercent = Math.round(state.volumeMic * 100);
-    addLog("manual", `「10分前予告音（マイク使用中・音量大:${volPercent}%）」の手動テスト再生を実行しました。`);
+    const volDb = state.volumeMic;
+    addLog("manual", `「10分前予告音（マイク使用中・音量大:${volDb}dB）」の手動テスト再生を実行しました。`);
   });
   
   document.getElementById("btnTest1MinMic").addEventListener("click", () => {
     playChime("1min", "テスト", "手動", state.volumeMic);
-    const volPercent = Math.round(state.volumeMic * 100);
-    addLog("manual", `「1分前予告音（マイク使用中・音量大:${volPercent}%）」の手動テスト再生を実行しました。`);
+    const volDb = state.volumeMic;
+    addLog("manual", `「1分前予告音（マイク使用中・音量大:${volDb}dB）」の手動テスト再生を実行しました。`);
   });
 
   // 手動テスト再生（マイクなし・音量小）
   document.getElementById("btnTest10MinNoMic").addEventListener("click", () => {
     playChime("10min", "テスト", "手動", state.volumeNoMic);
-    const volPercent = Math.round(state.volumeNoMic * 100);
-    addLog("manual", `「10分前予告音（マイクなし・音量小:${volPercent}%）」の手動テスト再生を実行しました。`);
+    const volDb = state.volumeNoMic;
+    addLog("manual", `「10分前予告音（マイクなし・音量小:${volDb}dB）」の手動テスト再生を実行しました。`);
   });
   
   document.getElementById("btnTest1MinNoMic").addEventListener("click", () => {
     playChime("1min", "テスト", "手動", state.volumeNoMic);
-    const volPercent = Math.round(state.volumeNoMic * 100);
-    addLog("manual", `「1分前予告音（マイクなし・音量小:${volPercent}%）」の手動テスト再生を実行しました。`);
+    const volDb = state.volumeNoMic;
+    addLog("manual", `「1分前予告音（マイクなし・音量小:${volDb}dB）」の手動テスト再生を実行しました。`);
   });
   
   // 日付ピッカーの操作

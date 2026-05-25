@@ -69,10 +69,10 @@
         <div style="margin-bottom: 12px; border-bottom: 1px dashed var(--border-color); padding-bottom: 12px;">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
             <span style="font-size: 0.85rem; font-weight: bold; color: var(--status-reserved);">🎤 マイク使用中 (音量大):</span>
-            <span id="volumeValueMic" style="font-size: 0.85rem; font-weight: bold; color: var(--status-reserved);">90%</span>
+            <span id="volumeValueMic" style="font-size: 0.85rem; font-weight: bold; color: var(--status-reserved);">75dB</span>
           </div>
           <div class="volume-control" style="margin-bottom: 8px;">
-            <input type="range" id="volumeSliderMic" class="volume-slider" min="0" max="1" step="0.05" value="0.9">
+            <input type="range" id="volumeSliderMic" class="volume-slider" min="50" max="90" step="1" value="75">
           </div>
           <div class="test-play-grid">
             <button id="btnTest10MinMic" class="btn-play-test" style="border-color: var(--status-reserved); color: var(--status-reserved);" title="マイク使用中（音量大）の10分前チャイムをテスト再生します">
@@ -88,10 +88,10 @@
         <div>
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
             <span style="font-size: 0.85rem; font-weight: bold; color: var(--primary-color);">🔇 マイク非使用 (音量小):</span>
-            <span id="volumeValueNoMic" style="font-size: 0.85rem; font-weight: bold; color: var(--primary-color);">40%</span>
+            <span id="volumeValueNoMic" style="font-size: 0.85rem; font-weight: bold; color: var(--primary-color);">70dB</span>
           </div>
           <div class="volume-control" style="margin-bottom: 8px;">
-            <input type="range" id="volumeSliderNoMic" class="volume-slider" min="0" max="1" step="0.05" value="0.4">
+            <input type="range" id="volumeSliderNoMic" class="volume-slider" min="50" max="90" step="1" value="70">
           </div>
           <div class="test-play-grid">
             <button id="btnTest10MinNoMic" class="btn-play-test" style="border-color: var(--primary-color); color: var(--primary-color);" title="マイク非使用（音量小）の10分前チャイムをテスト再生します">
