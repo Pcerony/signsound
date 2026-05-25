@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>福岡市南区市民会館 - 退室音響管理システム</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ヘッダーエリア -->
+  <header class="header-bar">
+    <div class="header-title-area">
+      <span class="header-logo">福岡市南区市民会館</span>
+      <h1 class="header-title">退室音響管理システム <span style="font-size: 0.9rem; font-weight: normal; opacity: 0.8;">(コミネット連携・職員用)</span></h1>
+    </div>
+    
+    <div class="header-controls">
+      <!-- 文字サイズ変更 -->
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 0.8rem; font-weight: bold;">文字サイズ:</span>
+        <div class="font-size-changer" id="fontSizeChanger">
+          <button class="font-btn" data-size="small">小</button>
+          <button class="font-btn active" data-size="medium">中</button>
+          <button class="font-btn" data-size="large">大</button>
+        </div>
+      </div>
+      
+      <!-- 現在時刻/仮想時刻表示 -->
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span id="clockLabel" style="font-size: 0.8rem; font-weight: bold; color: #ffcc00;">現在時刻:</span>
+        <div class="system-clock" id="systemClock">00:00:00</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- メインコンテンツレイアウト -->
+  <main class="main-container">
+    
+    <!-- 左サイドバー（ステータス、テスト、シミュレーター） -->
+    <section class="sidebar">
+      
+      <!-- システム状態＆起動 -->
+      <div class="card">
+        <div class="card-title">
+          <span>システム制御</span>
+          <span id="systemStatusBadge" class="status-badge status-inactive">待機中</span>
+        </div>
+        <div style="margin-bottom: 12px; font-size: 0.85rem; color: var(--text-muted);">
+          ブラウザの音声自動再生制限を解除するため、システム稼働開始時に以下のボタンを一度押してください。
+        </div>
+        <button id="btnSystemActivate" class="btn-system-activate">
+          🔊 システムを起動する
+        </button>
+      </div>
+
+      <!-- 次の放送予定カウントダウン -->
+      <div class="card">
+        <div class="card-title">放送予定カウントダウン</div>
+        <div class="countdown-box" id="countdownBox">
+          <div class="countdown-desc" id="countdownTargetDesc">現在、アクティブな予約はありません</div>
+          <div class="countdown-time" id="countdownTime">--:--:--</div>
+          <div class="countdown-desc" id="countdownNextTrigger">--分前放送に備えています</div>
+        </div>
+      </div>
+
+      <!-- 音声出力テスト＆音量設定 -->
+      <div class="card">
+        <div class="card-title">音声出力テスト（マイク使用状況別）</div>
+        
+        <!-- マイク使用時 (音量大) -->
+        <div style="margin-bottom: 12px; border-bottom: 1px dashed var(--border-color); padding-bottom: 12px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+            <span style="font-size: 0.85rem; font-weight: bold; color: var(--status-reserved);">🎤 マイク使用中 (音量大):</span>
+            <span id="volumeValueMic" style="font-size: 0.85rem; font-weight: bold; color: var(--status-reserved);">90%</span>
+          </div>
+          <div class="volume-control" style="margin-bottom: 8px;">
+            <input type="range" id="volumeSliderMic" class="volume-slider" min="0" max="1" step="0.05" value="0.9">
+          </div>
+          <div class="test-play-grid">
+            <button id="btnTest10MinMic" class="btn-play-test" style="border-color: var(--status-reserved); color: var(--status-reserved);" title="マイク使用中（音量大）の10分前チャイムをテスト再生します">
+              🔊 10分前 (大)
+            </button>
+            <button id="btnTest2MinMic" class="btn-play-test" style="border-color: var(--status-reserved); color: var(--status-reserved);" title="マイク使用中（音量大）の2分前チャイムをテスト再生します">
+              🔊 2分前 (大)
+            </button>
+          </div>
+        </div>
+
+        <!-- マイク非使用時 (音量小) -->
+        <div>
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+            <span style="font-size: 0.85rem; font-weight: bold; color: var(--primary-color);">🔇 マイク非使用 (音量小):</span>
+            <span id="volumeValueNoMic" style="font-size: 0.85rem; font-weight: bold; color: var(--primary-color);">40%</span>
+          </div>
+          <div class="volume-control" style="margin-bottom: 8px;">
+            <input type="range" id="volumeSliderNoMic" class="volume-slider" min="0" max="1" step="0.05" value="0.4">
+          </div>
+          <div class="test-play-grid">
+            <button id="btnTest10MinNoMic" class="btn-play-test" style="border-color: var(--primary-color); color: var(--primary-color);" title="マイク非使用（音量小）の10分前チャイムをテスト再生します">
+              🔉 10分前 (小)
+            </button>
+            <button id="btnTest2MinNoMic" class="btn-play-test" style="border-color: var(--primary-color); color: var(--primary-color);" title="マイク非使用（音量小）の2分前チャイムをテスト再生します">
+              🔉 2分前 (小)
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- テスト用仮想時間シミュレーター -->
+      <div class="card sim-panel">
+        <div class="sim-header">
+          <span>【動作検証用】時間シミュレーター</span>
+          <span style="font-size: 0.75rem; background: var(--status-simulation); color: white; padding: 2px 6px; border-radius: 3px;">検証用機能</span>
+        </div>
+        <div class="sim-toggle-area">
+          <input type="checkbox" id="simModeCheckbox" style="width: 18px; height: 18px; cursor: pointer;">
+          <label for="simModeCheckbox" style="font-weight: bold; font-size: 0.9rem; cursor: pointer; color: var(--status-simulation);">
+            シミュレーションを有効化
+          </label>
+        </div>
+        <div class="sim-controls" id="simControls" style="opacity: 0.5; pointer-events: none;">
+          <div class="sim-row">
+            <span>仮想設定時刻:</span>
+            <input type="time" id="simTimeInput" class="sim-input-time" value="10:49">
+            <span style="font-size: 0.75rem; color: var(--text-muted);">秒は00固定</span>
+          </div>
+          <div class="sim-row" style="margin-top: 6px;">
+            <span>時間の進み方:</span>
+            <div style="display: flex; gap: 4px;">
+              <button class="sim-speed-btn active" data-speed="1">1倍速</button>
+              <button class="sim-speed-btn" data-speed="10">10倍速</button>
+              <button class="sim-speed-btn" data-speed="60">60倍速(秒速分)</button>
+            </div>
+          </div>
+          <div style="font-size: 0.75rem; color: #d84315; margin-top: 4px; border-top: 1px dashed #ffe0b2; padding-top: 6px;">
+            ※ 10分前放送（各枠の終了10分前）や2分前放送（各枠の終了2分前）の直前に時間を設定すると、放送が正常に動作する様子をすばやく確認できます。
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- 右側メインコンテンツ（カレンダー/予約表、履歴ログ） -->
+    <section class="main-content">
+      
+      <!-- 日付選択パネル -->
+      <div class="date-selector-panel">
+        <button id="btnPrevDay" class="date-nav-btn">◀ 前の日</button>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span class="current-date-display" id="currentDateDisplay">2026年5月25日 (月)</span>
+          <input type="date" id="datePicker" style="padding: 4px; border-radius: 4px; border: 1px solid var(--border-color); cursor: pointer;">
+        </div>
+        <button id="btnNextDay" class="date-nav-btn">次の日 ▶</button>
+      </div>
+
+      <!-- 会議室一覧＆自動放送設定グリッド -->
+      <div class="card" style="padding: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h2 style="font-size: 1.2rem; font-weight: bold; color: var(--primary-color);">会議室利用・退室自動音響設定</h2>
+          <div class="bulk-actions">
+            <button id="btnBulkReserve" class="btn-secondary">全会議室を「予約済」に設定</button>
+            <button id="btnBulkVacant" class="btn-secondary">全会議室を「空室」に設定</button>
+            <button id="btnBulkReset" class="btn-secondary" style="border-color: #ffaa00; color: #b77900;">本日の設定をリセット</button>
+          </div>
+        </div>
+        
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">
+          会議室ごとの利用時間帯をクリックして「予約済」に設定すると、自動退室音が有効になります。
+          「予約済」の枠では、終了時刻の10分前および2分前に自動的に退室アナウンス音が鳴ります。必要に応じてチェックボックスを外すことで個別に放送をOFFにできます。
+        </p>
+
+        <div class="schedule-table-container">
+          <table class="schedule-table" id="scheduleTable">
+            <thead>
+              <tr>
+                <th class="room-col">会議室名</th>
+                <th>午前枠<br><span style="font-size: 0.8rem; font-weight: normal;">09:00 〜 11:00</span></th>
+                <th>午後枠<br><span style="font-size: 0.8rem; font-weight: normal;">13:00 〜 15:00</span></th>
+                <th>夜間枠<br><span style="font-size: 0.8rem; font-weight: normal;">18:00 〜 21:00</span></th>
+              </tr>
+            </thead>
+            <tbody id="scheduleTableBody">
+              <!-- JSで動的に構築されます -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- システム動作履歴ログ -->
+      <div class="card">
+        <div class="card-title">
+          <span>システム動作ログ</span>
+          <button id="btnClearLog" class="btn-secondary" style="padding: 2px 8px; font-size: 0.75rem;">履歴をクリア</button>
+        </div>
+        <div class="log-panel" id="logPanel">
+          <!-- 履歴エントリーが動的に挿入されます -->
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <footer style="text-align: center; font-size: 0.8rem; color: var(--text-muted); padding: 20px 0; border-top: 1px solid var(--border-light); background-color: #ffffff; margin-top: 40px;">
+    福岡市南区市民会館 - 退室案内自動放送管理システム v1.0.0 (ローカル動作環境)
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
