@@ -46,6 +46,7 @@ body {
 
 /* 3. レイアウトとヘッダー */
 .header-bar {
+  position: relative;
   background-color: var(--primary-color);
   color: #ffffff;
   padding: 12px 24px;
@@ -54,6 +55,23 @@ body {
   align-items: center;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   border-bottom: 3px solid #ffcc00; /* 公共サービス風の黄色いアクセントライン */
+  overflow: hidden;
+  z-index: 1;
+}
+
+.header-bar::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: url('background.jpeg');
+  background-size: cover;
+  background-position: center;
+  opacity: 0.35; /* 半透明背景画像 */
+  z-index: -1;
+  pointer-events: none;
 }
 
 .header-title-area {
@@ -461,6 +479,23 @@ body {
   font-size: 1rem;
 }
 
+.sim-btn-apply {
+  background-color: var(--status-simulation);
+  border: 1px solid var(--status-simulation);
+  color: #ffffff;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: bold;
+  transition: all 0.2s;
+}
+
+.sim-btn-apply:hover {
+  background-color: #d84315; /* Darker orange for hover */
+  border-color: #d84315;
+}
+
 .sim-speed-btn {
   background-color: #ffffff;
   border: 1px solid var(--status-simulation);
@@ -555,3 +590,453 @@ body {
   from { background-color: #e8f5e9; box-shadow: 0 0 8px rgba(46, 125, 50, 0.4); }
   to { background-color: #a5d6a7; box-shadow: 0 0 16px rgba(46, 125, 50, 0.7); }
 }
+
+/* 10. 地図・案内図表示モード (Map View & Floor Plan Blueprint Styles) */
+.view-mode-tabs {
+  display: flex;
+  background-color: var(--secondary-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 4px;
+  margin-bottom: 12px;
+  gap: 4px;
+}
+
+.tab-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  padding: 10px 16px;
+  font-size: 0.95rem;
+  font-weight: bold;
+  color: var(--primary-color);
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.tab-btn:hover {
+  background-color: rgba(0, 51, 102, 0.05);
+}
+
+.tab-btn.active {
+  background-color: var(--primary-color);
+  color: #ffffff;
+}
+
+.map-view-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.floor-controls-panel {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 12px 16px;
+  gap: 12px;
+}
+
+.floor-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.floor-tab-btn {
+  background-color: #ffffff;
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 8px 20px;
+  font-size: 0.95rem;
+  font-weight: bold;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.floor-tab-btn:hover {
+  background-color: #fafafa;
+}
+
+.floor-tab-btn.active {
+  background-color: var(--primary-color);
+  color: #ffffff;
+  border-color: var(--primary-color);
+}
+
+/* 建築平面図風レイアウト (Blueprint Layout) */
+.map-floor-plan {
+  background-color: #eef3f7; /* 図面用の薄いグリッド背景 */
+  border: 2px solid var(--primary-color);
+  border-radius: 8px;
+  padding: 16px; /* 1F・2Fの並列表示用余白 */
+  position: relative;
+  max-width: 720px; /* 1Fと2Fを並列表示するためコンテナを広げる */
+  margin: 0 auto;
+  box-shadow: inset 0 0 10px rgba(0, 51, 102, 0.05);
+  display: flex; /* 並列表示用のFlexbox */
+  justify-content: center;
+  gap: 16px; /* 1Fと2Fの間の隙間 */
+  overflow: hidden;
+}
+
+@media (max-width: 767px) {
+  .map-floor-plan {
+    flex-direction: column; /* モバイル等幅狭環境では縦並びにする */
+    max-width: 340px;
+    align-items: center;
+  }
+}
+
+.map-wing {
+  background-color: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 14px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.map-wing-title {
+  font-size: 1rem;
+  font-weight: bold;
+  color: var(--primary-color);
+  border-bottom: 2px solid var(--primary-color);
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.map-wing-badge {
+  font-size: 0.75rem;
+  background-color: var(--secondary-color);
+  color: var(--primary-color);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+/* 部屋セル要素 (Room Blueprint Block) */
+.map-room {
+  border: 1px solid #b0bec5;
+  border-radius: 4px;
+  padding: 10px 8px;
+  background-color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 54px;
+  text-align: center;
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.map-room-name {
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+
+.map-room-status {
+  font-size: 0.75rem;
+  margin-top: 2px;
+}
+
+.map-room.non-managed {
+  background-color: #eceff1;
+  color: #78909c;
+  border: 1px dashed #cfd8dc;
+  min-height: 40px;
+}
+
+.map-room.managed {
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.map-room.managed:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 部屋の利用状態に応じた配色 */
+.map-room.vacant {
+  background-color: #e8f5e9;
+  border-color: var(--status-vacant);
+  color: var(--status-vacant);
+}
+
+.map-room.vacant:hover {
+  background-color: #c8e6c9;
+}
+
+.map-room.reserved {
+  background-color: #ffebee;
+  border-color: var(--status-reserved);
+  color: var(--status-reserved);
+}
+
+.map-room.reserved:hover {
+  background-color: #ffcdd2;
+}
+
+/* マイク使用中の特別バッジ */
+.map-mic-badge {
+  font-size: 0.7rem;
+  background-color: var(--status-reserved);
+  color: #ffffff;
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin-top: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* 部屋編集ポップオーバー / モーダル (Modal Settings Overlay) */
+.room-popover-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.room-popover-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.room-popover {
+  background-color: #ffffff;
+  border: 2px solid var(--primary-color);
+  border-radius: 6px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+  transform: scale(0.9);
+  transition: transform 0.25s ease;
+  overflow: hidden;
+}
+
+.room-popover-overlay.active .room-popover {
+  transform: scale(1);
+}
+
+.popover-header {
+  background-color: var(--primary-color);
+  color: #ffffff;
+  padding: 12px 16px;
+  font-weight: bold;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.popover-close {
+  background: none;
+  border: none;
+  color: #ffffff;
+  font-size: 1.4rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.popover-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 図面フィルタ絞り込み */
+.filter-selector-label {
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: var(--primary-color);
+}
+
+.filter-select {
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+/* 11. インタラクティブSVG案内図（ベクター・マップ）スタイル */
+.floor-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  background-color: #eef3f7; /* 図面用紙の薄青グレー */
+  border-radius: 6px;
+  box-shadow: inset 0 0 15px rgba(0, 51, 102, 0.05);
+}
+
+/* 図面全体のグリッド背景（リアルな建築CAD風） */
+.map-floor-plan::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    linear-gradient(rgba(0, 51, 102, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 51, 102, 0.03) 1px, transparent 1px);
+  background-size: 20px 20px;
+  pointer-events: none;
+  border-radius: 8px;
+}
+
+/* SVG部屋の基本スタイル */
+.svg-room.managed {
+  cursor: pointer;
+}
+
+.svg-room.managed rect,
+.svg-room.managed path {
+  fill: #ffffff;
+  stroke: #78909c;
+  stroke-width: 1.5;
+  transition: all 0.2s ease;
+}
+
+/* 非管理対象部屋のデフォルトスタイル（インラインスタイルが指定されていないものにのみ適用） */
+.svg-room.non-managed rect:not([fill]),
+.svg-room.non-managed path:not([fill]) {
+  fill: #eceff1;
+}
+
+.svg-room.non-managed rect:not([stroke]),
+.svg-room.non-managed path:not([stroke]) {
+  stroke: #b0bec5;
+  stroke-dasharray: 3 3;
+}
+
+.svg-room.non-managed rect,
+.svg-room.non-managed path {
+  stroke-width: 1.5;
+}
+
+/* ホバー時の効果 */
+.svg-room.managed:hover rect,
+.svg-room.managed:hover path {
+  filter: drop-shadow(0px 4px 8px rgba(0,0,0,0.15));
+  stroke-width: 2px;
+}
+
+/* 利用ステータス配色（SVG） */
+.svg-room.vacant rect,
+.svg-room.vacant path {
+  fill: #e8f5e9 !important;
+  stroke: var(--status-vacant) !important;
+}
+
+.svg-room.vacant:hover rect,
+.svg-room.vacant:hover path {
+  fill: #c8e6c9 !important;
+}
+
+.svg-room.reserved rect,
+.svg-room.reserved path {
+  fill: #ffebee !important;
+  stroke: var(--status-reserved) !important;
+}
+
+.svg-room.reserved:hover rect,
+.svg-room.reserved:hover path {
+  fill: #ffcdd2 !important;
+}
+
+/* 放送中点滅アニメーション (SVG対応) */
+.svg-room.playing-now rect,
+.svg-room.playing-now path {
+  animation: svg-playing-flash 1s infinite alternate !important;
+}
+
+@keyframes svg-playing-flash {
+  from { fill: #e8f5e9; stroke: #2e7d32; filter: drop-shadow(0 0 4px rgba(46, 125, 50, 0.5)); }
+  to { fill: #a5d6a7; stroke: #2e7d32; filter: drop-shadow(0 0 12px rgba(46, 125, 50, 0.8)); }
+}
+
+/* SVGテキストレイアウト */
+.svg-room-text {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: bold;
+  fill: var(--text-main);
+  text-anchor: middle;
+  pointer-events: none; /* テキストをクリックしても背後の部屋のクリックが通るようにする */
+}
+
+/* 予約ありの部屋テキスト */
+.svg-room.reserved .svg-room-text {
+  fill: var(--status-reserved);
+}
+
+/* 空室の部屋テキスト */
+.svg-room.vacant .svg-room-text {
+  fill: var(--status-vacant);
+}
+
+.svg-room-status-text {
+  font-family: inherit;
+  font-size: 9px;
+  fill: var(--text-muted);
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+.svg-room.reserved .svg-room-status-text {
+  fill: #b71c1c;
+  font-weight: bold;
+}
+
+.svg-room.vacant .svg-room-status-text {
+  fill: #1b5e20;
+}
+
+/* 図面上の説明バッジ */
+.svg-legend-bar {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 10px;
+  font-size: 0.8rem;
+  background-color: #ffffff;
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: bold;
+}
+
+

@@ -1,14 +1,38 @@
 // app.js - 福岡市南区市民会館 退室音響管理システム 制御スクリプト
 
-// 1. 定数定義
-const DEFAULT_ROOMS = [
-  "多目的ホール",
-  "第1会議室",
-  "第2会議室",
-  "第3会議室",
-  "研修室",
-  "和室"
+// 1. 定数定義（全18部屋の構成データ。そのうち特定の10部屋のみが管理対象）
+const ROOMS_CONFIG = [
+  // 1階 社会教育棟
+  { name: "和室", floor: "1F", wing: "social", type: "meeting", managed: true },
+  { name: "託児室", floor: "1F", wing: "social", type: "other", managed: false },
+  { name: "会議室5", floor: "1F", wing: "social", type: "meeting", managed: true },
+  
+  // 1階 中央棟
+  { name: "大練習室", floor: "1F", wing: "central", type: "practice", managed: false },
+  { name: "小練習室1", floor: "1F", wing: "central", type: "practice", managed: false },
+  { name: "小練習室2", floor: "1F", wing: "central", type: "practice", managed: false },
+  { name: "小練習室3", floor: "1F", wing: "central", type: "practice", managed: false },
+  { name: "小練習室4", floor: "1F", wing: "central", type: "practice", managed: false },
+  
+  // 1階 文化ホール棟
+  { name: "文化ホール", floor: "1F", wing: "hall", type: "hall", managed: false },
+  
+  // 2階 社会教育棟
+  { name: "会議室1", floor: "2F", wing: "social", type: "meeting", managed: true },
+  { name: "会議室2", floor: "2F", wing: "social", type: "meeting", managed: true },
+  { name: "会議室3", floor: "2F", wing: "social", type: "meeting", managed: true },
+  { name: "会議室4", floor: "2F", wing: "social", type: "meeting", managed: true },
+  { name: "実習室1", floor: "2F", wing: "social", type: "practice", managed: true },
+  { name: "実習室2", floor: "2F", wing: "social", type: "practice", managed: true },
+  { name: "研修室", floor: "2F", wing: "social", type: "meeting", managed: true },
+  { name: "視聴覚室", floor: "2F", wing: "social", type: "meeting", managed: true },
+  
+  // 2階 中央棟
+  { name: "中練習室", floor: "2F", wing: "central", type: "practice", managed: false }
 ];
+
+// 管理対象のみ（和室、会議室1-5、実習室1-2、研修室、視聴覚室）
+const DEFAULT_ROOMS = ROOMS_CONFIG.filter(r => r.managed).map(r => r.name);
 
 const TIME_SLOTS = [
   { id: "morning", name: "午前枠", start: "09:00", end: "11:00", startMin: 9 * 60, endMin: 11 * 60 },
@@ -19,14 +43,14 @@ const TIME_SLOTS = [
 // 音声ファイルへのパス (相対パス)
 const AUDIO_PATHS = {
   "10min": "アーカイブ 3/10分前v2.wav",
-  "1min": "アーカイブ 3/1分前v2.wav" // 1分前のタイミングで「1分前v2.wav」を使用
+  "1min": "アーカイブ 3/1分前v2.wav"
 };
 
 // 2. 状態変数 (State)
 let state = {
   currentDate: "",          // "YYYY-MM-DD" フォーマット
   reservations: {},         // { "YYYY-MM-DD": { "部屋名": { "slotId": { reserved: bool, play10: bool, play1: bool, useMic: bool } } } }
-  isSystemActivated: false, // ブラウザ音声アンロック状態
+  isSystemActivated: true,  // ブラウザ音声アンロック状態（初期状態で強制オン）
   volumeMic: 0.9,           // マイク使用時の大音量
   volumeNoMic: 0.4,         // マイク非使用時の小音量
   logs: []
@@ -38,6 +62,12 @@ let lastRealTime = Date.now();
 let simMode = false;
 let simSpeed = 1;
 let triggeredToday = {}; // { "YYYY-MM-DD_room_slot_type": true } (当日再生済みのトリガー重複防止)
+
+// フィルタ・マップ状態
+let gridFilter = "all";           // "all" | "1F" | "2F"
+let currentMapFloor = "1F";       // "1F" | "2F"
+let currentMapSlot = "afternoon"; // "morning" | "afternoon" | "night"
+let activePopoverRoom = null;
 
 // オーディオ要素
 let audioElements = {
@@ -57,6 +87,9 @@ window.addEventListener("DOMContentLoaded", () => {
   // ローカルストレージからロード
   loadFromLocalStorage();
   
+  // システム制御を初期状態で強制アクティブ化
+  activateSystemAutomatically();
+  
   // 日付ピッカーの初期値設定
   const datePicker = document.getElementById("datePicker");
   datePicker.value = todayStr;
@@ -64,6 +97,7 @@ window.addEventListener("DOMContentLoaded", () => {
   // 画面表示更新
   updateDateDisplay();
   renderScheduleGrid();
+  renderFloorMap();
   updateVolumeDisplay();
   renderLogs();
   
@@ -72,6 +106,27 @@ window.addEventListener("DOMContentLoaded", () => {
   
   // 1秒に1回動くメインループ開始
   setInterval(tick, 100); // 高精度シミュレーションのために100ms周期でチェック
+
+  // 透過的なブラウザ音声制限解除（画面のどこかをクリックした際に自動でAudioContextをアンロック）
+  const unlockAudioOnFirstClick = () => {
+    const context = new (window.AudioContext || window.webkitAudioContext)();
+    if (context.state === 'suspended') {
+      context.resume();
+    }
+    
+    // ダミーの極小音量再生によるブラウザ制限解除
+    const temp1 = new Audio(AUDIO_PATHS["10min"]);
+    const temp2 = new Audio(AUDIO_PATHS["1min"]);
+    temp1.volume = 0.001;
+    temp2.volume = 0.001;
+    temp1.play().then(() => temp1.pause()).catch(() => {});
+    temp2.play().then(() => temp2.pause()).catch(() => {});
+    
+    document.removeEventListener("click", unlockAudioOnFirstClick);
+    document.removeEventListener("touchstart", unlockAudioOnFirstClick);
+  };
+  document.addEventListener("click", unlockAudioOnFirstClick);
+  document.addEventListener("touchstart", unlockAudioOnFirstClick);
 });
 
 // オーディオの初期化
@@ -89,7 +144,7 @@ function loadFromLocalStorage() {
   if (savedReservations) {
     try {
       const parsed = JSON.parse(savedReservations);
-      // 古いキー「play2」を「play1」に移行・互換処理
+      // 旧データのクレンジングとキーの互換性確保
       Object.keys(parsed).forEach(dateKey => {
         Object.keys(parsed[dateKey]).forEach(roomKey => {
           Object.keys(parsed[dateKey][roomKey]).forEach(slotKey => {
@@ -97,6 +152,9 @@ function loadFromLocalStorage() {
             if (data.play2 !== undefined && data.play1 === undefined) {
               data.play1 = data.play2;
               delete data.play2;
+            }
+            if (data.useMic === undefined) {
+              data.useMic = false;
             }
           });
         });
@@ -189,13 +247,27 @@ function renderScheduleGrid() {
   initDateDataIfNeeded(state.currentDate);
   const dayData = state.reservations[state.currentDate];
   
-  DEFAULT_ROOMS.forEach(room => {
+  // 管理対象のすべての部屋を表示
+  const filteredRooms = ROOMS_CONFIG.filter(room => room.managed);
+  
+  if (filteredRooms.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:20px; color:var(--text-muted);">該当する部屋はありません。</td></tr>`;
+    return;
+  }
+
+  filteredRooms.forEach(roomObj => {
+    const room = roomObj.name;
     const tr = document.createElement("tr");
     
     // 会議室名セル
     const roomCell = document.createElement("td");
     roomCell.className = "room-col";
-    roomCell.innerText = room;
+    roomCell.innerHTML = `
+      <div>${room}</div>
+      <div style="font-size:0.75rem; font-weight:normal; color:var(--text-muted); margin-top:2px;">
+        ${roomObj.floor}・${roomObj.wing === 'social' ? '社会教育棟' : roomObj.wing === 'central' ? '中央棟' : '文化ホール棟'}
+      </div>
+    `;
     tr.appendChild(roomCell);
     
     // 各時間枠のセル
@@ -205,12 +277,11 @@ function renderScheduleGrid() {
       td.id = `cell_${room}_${slot.id}`;
       
       const slotData = dayData[room][slot.id];
-      // 後方互換性の確保
       if (slotData.useMic === undefined) {
         slotData.useMic = false;
       }
       if (slotData.play1 === undefined) {
-        slotData.play1 = slotData.play2 !== undefined ? slotData.play2 : true;
+        slotData.play1 = true;
       }
       
       // 内包コンテナ
@@ -224,13 +295,13 @@ function renderScheduleGrid() {
       
       btn.addEventListener("click", () => {
         slotData.reserved = !slotData.reserved;
-        // 予約済に切り替えたら、自動放送の初期チェックをONにする
         if (slotData.reserved) {
           slotData.play10 = true;
           slotData.play1 = true;
         }
         saveReservations();
         renderScheduleGrid();
+        renderFloorMap();
         addLog("sys", `【設定変更】${room} の ${slot.name} を ${slotData.reserved ? '予約済' : '空室'} に変更しました。`);
       });
       
@@ -253,6 +324,7 @@ function renderScheduleGrid() {
       chk10.addEventListener("change", (e) => {
         slotData.play10 = e.target.checked;
         saveReservations();
+        renderFloorMap();
         addLog("sys", `【設定変更】${room} ${slot.name} の「10分前放送」を ${slotData.play10 ? '有効' : '無効'} にしました。`);
       });
       label10.appendChild(chk10);
@@ -269,13 +341,14 @@ function renderScheduleGrid() {
       chk1.addEventListener("change", (e) => {
         slotData.play1 = e.target.checked;
         saveReservations();
+        renderFloorMap();
         addLog("sys", `【設定変更】${room} ${slot.name} の「1分前放送」を ${slotData.play1 ? '有効' : '無効'} にしました。`);
       });
       label1.appendChild(chk1);
       label1.appendChild(document.createTextNode(" 1分前放送"));
       togglesDiv.appendChild(label1);
       
-      // 🎤 マイク使用チェックボックス (音量大・小の切り替え)
+      // 🎤 マイク使用チェックボックス
       const labelMic = document.createElement("label");
       labelMic.className = "audio-toggle-label";
       labelMic.style.color = "var(--status-reserved)";
@@ -292,6 +365,7 @@ function renderScheduleGrid() {
         slotData.useMic = e.target.checked;
         saveReservations();
         renderScheduleGrid();
+        renderFloorMap();
         const volPercent = Math.round((slotData.useMic ? state.volumeMic : state.volumeNoMic) * 100);
         addLog("sys", `【設定変更】${room} ${slot.name} の「マイク使用（音量大:${volPercent}%）」を ${slotData.useMic ? 'ON' : 'OFF'} にしました。`);
       });
@@ -306,6 +380,276 @@ function renderScheduleGrid() {
     
     tbody.appendChild(tr);
   });
+}
+
+// 案内図（マップモード）の動的描画 - architectural blueprint floor maps using interactive SVGs!
+function renderFloorMap() {
+  const mapContainer = document.getElementById("mapFloorPlan");
+  if (!mapContainer) return;
+  
+  initDateDataIfNeeded(state.currentDate);
+  const dayData = state.reservations[state.currentDate];
+  
+  // --- 1階 案内図 SVGの組み立て（社会教育棟のみ） ---
+  const svg1F = `
+    <svg viewBox="-10 0 280 485" class="floor-svg" style="width: 100%; height: auto; display: block; flex: 1; max-width: 340px;">
+      <defs>
+        <pattern id="gridPattern1" width="20" height="20" patternUnits="userSpaceOnUse">
+          <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(0, 51, 102, 0.04)" stroke-width="1"/>
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#gridPattern1)" />
+
+      <!-- 1F 各棟のアウトライン/外壁 -->
+      <!-- 社会教育棟 -->
+      <rect x="25" y="25" width="210" height="450" rx="6" fill="#fcfdfe" stroke="#90a4ae" stroke-width="2" />
+      <text x="130" y="20" font-size="11" font-weight="bold" fill="var(--primary-color)" text-anchor="middle">社会教育棟 1F (Social Education Wing)</text>
+
+      <!-- ================= 部屋レイアウト ================= -->
+      
+      <!-- --- 社会教育棟1F --- -->
+      <!-- 🚻 トイレ (非管理) -->
+      <g class="svg-room non-managed">
+        <rect x="35" y="35" width="125" height="110" rx="3" />
+        <text x="97" y="85" font-size="11" font-weight="bold" fill="#78909c" text-anchor="middle">🚻 トイレ / 授乳室</text>
+        <text x="97" y="105" font-size="9" fill="#90a4ae" text-anchor="middle">女子・男子・多目的</text>
+      </g>
+      
+      <!-- 和室 (管理対象) -->
+      ${renderSvgRoom("和室", "rect", { x: 165, y: 35, width: 60, height: 110, rx: 3 }, dayData)}
+      
+      <!-- 会議室5 (管理対象) -->
+      ${renderSvgRoom("会議室5", "rect", { x: 35, y: 150, width: 70, height: 70, rx: 3 }, dayData)}
+      
+      <!-- 託児室 (非管理対象) -->
+      <g class="svg-room non-managed">
+        <rect x="110" y="150" width="115" height="70" rx="3" />
+        <text x="167" y="190" font-size="11" font-weight="bold" fill="#78909c" text-anchor="middle">託児室</text>
+      </g>
+      
+      <!-- 図書館事務室 / 南図書館 (非管理) -->
+      <g class="svg-room non-managed">
+        <rect x="35" y="225" width="190" height="40" rx="3" fill="#eceff1" stroke="#b0bec5" stroke-width="1.5" stroke-dasharray="3" />
+        <text x="130" y="249" font-size="11" font-weight="bold" fill="#78909c" text-anchor="middle">図書館事務室</text>
+      </g>
+      <g class="svg-room non-managed">
+        <rect x="35" y="270" width="190" height="195" rx="3" fill="#eceff1" stroke="#b0bec5" stroke-width="1.5" stroke-dasharray="3" />
+        <text x="130" y="340" font-size="15" font-weight="bold" fill="#78909c" text-anchor="middle">南図書館 (1F)</text>
+        <text x="82" y="420" font-size="10" fill="#90a4ae" text-anchor="middle">閲覧スペース</text>
+        <text x="178" y="420" font-size="10" fill="#90a4ae" text-anchor="middle">児童書エリア</text>
+        <line x1="130" y1="400" x2="130" y2="440" stroke="#cfd8dc" stroke-dasharray="2" />
+      </g>
+
+    </svg>
+  `;
+
+  // --- 2階 案内図 SVGの組み立て（社会教育棟のみ） ---
+  const svg2F = `
+    <svg viewBox="15 0 280 485" class="floor-svg" style="width: 100%; height: auto; display: block; flex: 1; max-width: 340px;">
+      <defs>
+        <pattern id="gridPattern2" width="20" height="20" patternUnits="userSpaceOnUse">
+          <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(0, 51, 102, 0.04)" stroke-width="1"/>
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#gridPattern2)" />
+
+      <!-- 2F 各棟のアウトライン/外壁 -->
+      <!-- 社会教育棟 -->
+      <rect x="25" y="25" width="260" height="450" rx="6" fill="#fcfdfe" stroke="#90a4ae" stroke-width="2" />
+      <text x="155" y="20" font-size="11" font-weight="bold" fill="var(--primary-color)" text-anchor="middle">社会教育棟 2F (Social Education Wing)</text>
+
+      <!-- ================= 部屋レイアウト ================= -->
+      
+      <!-- --- 社会教育棟2F --- -->
+      <!-- 🚻 トイレ (非管理) -->
+      <g class="svg-room non-managed">
+        <rect x="35" y="35" width="120" height="55" rx="3" />
+        <text x="95" y="68" font-size="11" font-weight="bold" fill="#78909c" text-anchor="middle">🚻 男子/女子トイレ</text>
+      </g>
+      
+      <!-- 実習室2 (管理対象) -->
+      ${renderSvgRoom("実習室2", "rect", { x: 35, y: 95, width: 140, height: 65, rx: 3 }, dayData)}
+      
+      <!-- 実習室1 (管理対象) -->
+      ${renderSvgRoom("実習室1", "rect", { x: 35, y: 165, width: 140, height: 65, rx: 3 }, dayData)}
+      
+      <!-- 研修室 (管理対象) -->
+      ${renderSvgRoom("研修室", "rect", { x: 35, y: 235, width: 140, height: 75, rx: 3 }, dayData)}
+      
+      <!-- 視聴覚室 (管理対象) -->
+      ${renderSvgRoom("視聴覚室", "rect", { x: 35, y: 315, width: 140, height: 75, rx: 3 }, dayData)}
+      
+      <!-- 会議室3 (管理対象) -->
+      ${renderSvgRoom("会議室3", "rect", { x: 125, y: 395, width: 100, height: 65, rx: 3 }, dayData)}
+
+      <!-- 右列（会議室4, 吹抜, 会議室1-2） -->
+      <!-- 会議室4 (管理対象) -->
+      ${renderSvgRoom("会議室4", "rect", { x: 185, y: 35, width: 90, height: 65, rx: 3 }, dayData)}
+      
+      <!-- 吹抜ロビー (非管理) -->
+      <g class="svg-room non-managed">
+        <rect x="185" y="105" width="90" height="85" rx="3" fill="#eceff1" stroke="#cfd8dc" stroke-width="1.5" stroke-dasharray="3" />
+        <text x="230" y="150" font-size="11" font-weight="bold" fill="#90a4ae" text-anchor="middle">吹抜スペース</text>
+      </g>
+      
+      <!-- 会議室1 (管理対象) -->
+      ${renderSvgRoom("会議室1", "rect", { x: 185, y: 195, width: 90, height: 65, rx: 3 }, dayData)}
+      
+      <!-- 会議室2 (管理対象) -->
+      ${renderSvgRoom("会議室2", "rect", { x: 185, y: 265, width: 90, height: 65, rx: 3 }, dayData)}
+
+      <!-- 廊下/吹抜 (非管理) -->
+      <g class="svg-room non-managed">
+        <rect x="185" y="335" width="90" height="55" rx="3" />
+        <text x="230" y="368" font-size="10" fill="#90a4ae" text-anchor="middle">2F コリドー</text>
+      </g>
+
+    </svg>
+  `;
+  
+  mapContainer.innerHTML = svg1F + svg2F;
+}
+
+// 案内図非管理ブロックテンプレート
+function createNonManagedBlock(name, extraStyle = "") {
+  return ""; 
+}
+
+// SVG用管理室ブロック描画ヘルパー
+function renderSvgRoom(roomName, svgTag, attrs, dayData) {
+  const slotData = dayData[roomName][currentMapSlot];
+  if (!slotData) return "";
+  
+  if (slotData.useMic === undefined) slotData.useMic = false;
+  if (slotData.play1 === undefined) slotData.play1 = true;
+  
+  // 予約状態に応じたCSSクラス決定
+  let statusClass = "vacant";
+  if (slotData.reserved) {
+    statusClass = "reserved";
+  }
+  
+  // 自動放送作動中の点滅ID
+  const elementId = `map_cell_${roomName}_${currentMapSlot}`;
+  
+  // SVGタグ属性の組み立て
+  let attrStr = "";
+  Object.keys(attrs).forEach(key => {
+    attrStr += ` ${key}="${attrs[key]}"`;
+  });
+  
+  // テキスト中央揃え座標の計算
+  let cx = 0;
+  let cy = 0;
+  if (svgTag === "rect") {
+    cx = attrs.x + attrs.width / 2;
+    cy = attrs.y + attrs.height / 2;
+  } else if (svgTag === "path") {
+    cx = 820;
+    cy = 225;
+  }
+  
+  // 状態テキスト
+  let statusText = "空室";
+  let micText = "";
+  
+  if (slotData.reserved) {
+    let chkText = "";
+    if (slotData.play10 && slotData.play1) chkText = "自動放送:ON";
+    else if (slotData.play10) chkText = "10分前のみ";
+    else if (slotData.play1) chkText = "1分前のみ";
+    else chkText = "放送OFF";
+    
+    statusText = `利用中 (${chkText})`;
+    micText = slotData.useMic ? "🎤大音量" : "🔇小音量";
+  }
+  
+  // 手動クリックイベント呼び出し
+  const onclickStr = `onclick="openRoomPopover('${roomName}')"`;
+  
+  let shapeElement = "";
+  if (svgTag === "rect") {
+    shapeElement = `<rect class="room-shape ${statusClass}"${attrStr} />`;
+  } else if (svgTag === "path") {
+    shapeElement = `<path class="room-shape ${statusClass}"${attrStr} />`;
+  }
+  
+  // マイク音量インジケータ（利用中のみ表示）
+  let micBadgeElement = "";
+  if (slotData.reserved) {
+    const badgeColor = slotData.useMic ? "var(--status-reserved)" : "var(--primary-color)";
+    micBadgeElement = `
+      <g transform="translate(${cx - 30}, ${cy + 22})" style="pointer-events: none;">
+        <rect x="0" y="0" width="60" height="13" rx="2" fill="${badgeColor}" />
+        <text x="30" y="10" font-size="8" fill="#ffffff" font-weight="bold" text-anchor="middle">${micText}</text>
+      </g>
+    `;
+  }
+  
+  return `
+    <g class="svg-room managed ${statusClass}" id="${elementId}" ${onclickStr}>
+      ${shapeElement}
+      <text x="${cx}" y="${cy - 5}" class="svg-room-text">${roomName}</text>
+      <text x="${cx}" y="${cy + 12}" class="svg-room-status-text">${statusText}</text>
+      ${micBadgeElement}
+    </g>
+  `;
+}
+
+// 部屋設定ポップオーバーの展開
+function openRoomPopover(roomName) {
+  activePopoverRoom = roomName;
+  initDateDataIfNeeded(state.currentDate);
+  const dayData = state.reservations[state.currentDate];
+  const slotData = dayData[roomName][currentMapSlot];
+  
+  if (slotData.useMic === undefined) slotData.useMic = false;
+  if (slotData.play1 === undefined) slotData.play1 = true;
+  
+  // ポップオーバーのヘッダータイトル更新
+  const roomConfig = ROOMS_CONFIG.find(r => r.name === roomName);
+  const floorStr = roomConfig.floor;
+  const wingStr = roomConfig.wing === 'social' ? '社会教育棟' : roomConfig.wing === 'central' ? '中央棟' : '文化ホール棟';
+  const slotStr = TIME_SLOTS.find(s => s.id === currentMapSlot).name;
+  
+  document.getElementById("popoverRoomTitle").innerText = `${roomName} [${floorStr}・${wingStr} - ${slotStr}]`;
+  
+  // 利用状況ボタンの反映
+  updatePopoverStatusDisplay(slotData.reserved);
+  
+  // チェックボックス類の反映
+  const chk10 = document.getElementById("popoverPlay10");
+  const chk1 = document.getElementById("popoverPlay1");
+  const chkMic = document.getElementById("popoverUseMic");
+  
+  chk10.checked = slotData.play10;
+  chk1.checked = slotData.play1;
+  chkMic.checked = slotData.useMic;
+  
+  chk10.disabled = !slotData.reserved;
+  chk1.disabled = !slotData.reserved;
+  chkMic.disabled = !slotData.reserved;
+  
+  document.getElementById("popoverAudioToggles").style.opacity = slotData.reserved ? "1" : "0.5";
+  
+  // モーダル展開
+  document.getElementById("roomPopoverOverlay").classList.add("active");
+}
+
+function closeRoomPopover() {
+  document.getElementById("roomPopoverOverlay").classList.remove("active");
+  activePopoverRoom = null;
+}
+
+function updatePopoverStatusDisplay(isReserved) {
+  const toggleBtn = document.getElementById("popoverReserveToggle");
+  if (isReserved) {
+    toggleBtn.className = "btn-reserve-toggle reserved";
+    toggleBtn.innerText = "🔴 予約済 (利用中)";
+  } else {
+    toggleBtn.className = "btn-reserve-toggle vacant";
+    toggleBtn.innerText = "🟢 空室 (利用なし)";
+  }
 }
 
 function updateVolumeDisplay() {
@@ -358,6 +702,25 @@ function initAudioContextUnlock() {
   addLog("sys", "【システム】退室音響管理システムを起動しました。自動音声再生が有効です。");
 }
 
+// システム自動有効化処理 (強制オン)
+function activateSystemAutomatically() {
+  state.isSystemActivated = true;
+  
+  const badge = document.getElementById("systemStatusBadge");
+  if (badge) {
+    badge.className = "status-badge status-active";
+    badge.innerText = "稼働中";
+  }
+  
+  const btn = document.getElementById("btnSystemActivate");
+  if (btn) {
+    btn.className = "btn-system-activate active";
+    btn.innerHTML = "🟢 システム稼働中（音声再生有効・自動起動済）";
+    btn.disabled = true; // 手動操作は不要
+    btn.style.cursor = "default";
+  }
+}
+
 // チャイム再生
 function playChime(type, roomName = "テスト", slotName = "手動", forceVolume = null) {
   if (!state.isSystemActivated) {
@@ -406,13 +769,22 @@ function playChime(type, roomName = "テスト", slotName = "手動", forceVolum
     }
   }
 
-  // 自動放送時は、該当するセルのスタイルを一時的に光らせる
+  // 自動放送時のセル点滅（グリッドとマップ両方を光らせる）
   if (roomName !== "テスト") {
+    // テーブル内のセル
     const cell = document.getElementById(`cell_${roomName}_${slotName}`);
     if (cell) {
       cell.classList.add("playing-now");
       setTimeout(() => {
         cell.classList.remove("playing-now");
+      }, 15000); // 15秒間光らせる
+    }
+    // マップ内の部屋
+    const mapCell = document.getElementById(`map_cell_${roomName}_${slotName}`);
+    if (mapCell) {
+      mapCell.classList.add("playing-now");
+      setTimeout(() => {
+        mapCell.classList.remove("playing-now");
       }, 15000); // 15秒間光らせる
     }
   }
@@ -491,6 +863,7 @@ function checkBroadcastTriggers() {
           triggeredToday[trigger10Key] = true;
           playChime("10min", room, slot.id);
           addLog("auto", `【自動放送】${room} の ${slot.name} （終了10分前・${micText}）の予告音声を放送しました。`);
+          renderFloorMap(); // 状態更新
         }
       }
       
@@ -502,6 +875,7 @@ function checkBroadcastTriggers() {
           triggeredToday[trigger1Key] = true;
           playChime("1min", room, slot.id);
           addLog("auto", `【自動放送】${room} の ${slot.name} （終了1分前・${micText}）の予告音声を放送しました。`);
+          renderFloorMap(); // 状態更新
         }
       }
     });
@@ -517,11 +891,7 @@ function updateCountdown() {
   const currentSeconds = systemTime.getSeconds();
   const currMin = currentHours * 60 + currentMinutes + currentSeconds / 60;
   
-  let nextTrigger = null;
-  let minDiff = Infinity;
-  let targetRoom = "";
-  let targetSlotName = "";
-  let targetType = "";
+  let candidates = [];
   
   const dayData = state.reservations[dateStr];
   
@@ -536,12 +906,15 @@ function updateCountdown() {
           const t10 = slot.endMin - 10;
           const diff10 = t10 - currMin;
           const triggerKey = `${dateStr}_${room}_${slot.id}_10min`;
-          if (diff10 > 0 && diff10 < minDiff && !triggeredToday[triggerKey]) {
-            minDiff = diff10;
-            targetRoom = room;
-            targetSlotName = slot.name;
-            targetType = `10分前放送 (${slotData.useMic ? '🎤大音量' : '🔇小音量'})`;
-            nextTrigger = t10;
+          if (diff10 > 0 && !triggeredToday[triggerKey]) {
+            candidates.push({
+              room: room,
+              slotName: slot.name,
+              type: "10分前放送",
+              useMic: slotData.useMic,
+              diff: diff10,
+              diffSeconds: Math.ceil(diff10 * 60)
+            });
           }
         }
         
@@ -550,12 +923,15 @@ function updateCountdown() {
           const t1 = slot.endMin - 1;
           const diff1 = t1 - currMin;
           const triggerKey = `${dateStr}_${room}_${slot.id}_1min`;
-          if (diff1 > 0 && diff1 < minDiff && !triggeredToday[triggerKey]) {
-            minDiff = diff1;
-            targetRoom = room;
-            targetSlotName = slot.name;
-            targetType = `1分前放送 (${slotData.useMic ? '🎤大音量' : '🔇小音量'})`;
-            nextTrigger = t1;
+          if (diff1 > 0 && !triggeredToday[triggerKey]) {
+            candidates.push({
+              room: room,
+              slotName: slot.name,
+              type: "1分前放送",
+              useMic: slotData.useMic,
+              diff: diff1,
+              diffSeconds: Math.ceil(diff1 * 60)
+            });
           }
         }
       });
@@ -567,25 +943,48 @@ function updateCountdown() {
   const timeDisplay = document.getElementById("countdownTime");
   const nextTriggerLabel = document.getElementById("countdownNextTrigger");
   
-  if (nextTrigger !== null) {
-    targetDesc.innerHTML = `<strong style="color:var(--primary-color)">${targetRoom}</strong><br>${targetSlotName}の終了に向けた放送`;
-    nextTriggerLabel.innerText = `次の放送: ${targetType}`;
+  if (candidates.length > 0) {
+    // 最も近い秒数を探す
+    let minSec = Infinity;
+    candidates.forEach(c => {
+      if (c.diffSeconds < minSec) {
+        minSec = c.diffSeconds;
+      }
+    });
     
-    const totalSeconds = Math.ceil(minDiff * 60);
-    const mm = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
-    const ss = String(totalSeconds % 60).padStart(2, '0');
+    // 同じ秒数を持つトリガーを抽出 (複数同時に放送される場合)
+    // 許容誤差として ±1秒も含める (誤差があってもまとまるようにする)
+    const closest = candidates.filter(c => Math.abs(c.diffSeconds - minSec) <= 1);
     
-    timeDisplay.innerText = `${mm}:${ss}`;
-    countdownBox.style.backgroundColor = "#e8f0fe";
-  } else {
-    targetDesc.innerText = "本日のアクティブな放送予定はありません";
-    timeDisplay.innerText = "--:--";
-    nextTriggerLabel.innerText = "予約状況または放送スイッチを確認してください";
-    countdownBox.style.backgroundColor = "#f5f5f5";
+    if (closest.length > 0) {
+      // 部屋名を結合 (例: 「会議室5・和室」)
+      const roomNames = closest.map(c => c.room).filter((value, index, self) => self.indexOf(value) === index);
+      const roomDetails = roomNames.map(name => `<strong style="color:var(--primary-color)">${name}</strong>`).join("・");
+      const slotName = closest[0].slotName;
+      
+      // 各部屋の放送タイプとマイク使用状況
+      const types = closest.map(c => `${c.type}(${c.useMic ? '🎤大音量' : '🔇小音量'})`).filter((value, index, self) => self.indexOf(value) === index);
+      
+      targetDesc.innerHTML = `${roomDetails}<br>${slotName}の終了に向けた放送`;
+      nextTriggerLabel.innerText = `次の放送: ${types.join("・")}`;
+      
+      const mm = String(Math.floor(minSec / 60)).padStart(2, '0');
+      const ss = String(minSec % 60).padStart(2, '0');
+      
+      timeDisplay.innerText = `${mm}:${ss}`;
+      countdownBox.style.backgroundColor = "#e8f0fe";
+      return;
+    }
   }
+  
+  // 予定がない場合
+  targetDesc.innerText = "本日のアクティブな放送予定はありません";
+  timeDisplay.innerText = "--:--";
+  nextTriggerLabel.innerText = "予約状況または放送スイッチを確認してください";
+  countdownBox.style.backgroundColor = "#f5f5f5";
 }
 
-// 8. ログ管理処理
+// 9. ログ管理処理
 function addLog(type, msg) {
   const now = new Date(systemTime);
   const timestamp = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
@@ -608,6 +1007,7 @@ function addLog(type, msg) {
 
 function renderLogs() {
   const panel = document.getElementById("logPanel");
+  if (!panel) return;
   panel.innerHTML = "";
   
   if (state.logs.length === 0) {
@@ -644,7 +1044,7 @@ function renderLogs() {
   });
 }
 
-// 9. イベントリスナー登録と制御
+// 10. イベントリスナー登録と制御
 function registerEventListeners() {
   // システム起動ボタン
   document.getElementById("btnSystemActivate").addEventListener("click", () => {
@@ -662,6 +1062,136 @@ function registerEventListeners() {
     const size = e.target.dataset.size;
     document.body.className = `font-${size}`;
   });
+
+  // リスト・マップ表示モード切替
+  const tabListView = document.getElementById("tabListView");
+  const tabMapView = document.getElementById("tabMapView");
+  const listViewSection = document.getElementById("listViewSection");
+  const mapViewSection = document.getElementById("mapViewSection");
+  
+  tabListView.addEventListener("click", () => {
+    tabListView.classList.add("active");
+    tabMapView.classList.remove("active");
+    listViewSection.style.display = "block";
+    mapViewSection.style.display = "none";
+    renderScheduleGrid(); 
+  });
+  
+  tabMapView.addEventListener("click", () => {
+    tabMapView.classList.add("active");
+    tabListView.classList.remove("active");
+    listViewSection.style.display = "none";
+    mapViewSection.style.display = "block";
+    renderFloorMap(); 
+  });
+
+
+
+  // マップ時間枠セレクタ
+  const mapTimeSlotSelector = document.getElementById("mapTimeSlotSelector");
+  mapTimeSlotSelector.addEventListener("change", (e) => {
+    currentMapSlot = e.target.value;
+    renderFloorMap();
+  });
+
+
+
+  // ポップオーバー閉じイベント
+  document.getElementById("popoverCloseBtn").addEventListener("click", closeRoomPopover);
+  document.getElementById("roomPopoverOverlay").addEventListener("click", (e) => {
+    if (e.target.id === "roomPopoverOverlay") {
+      closeRoomPopover();
+    }
+  });
+
+  // ポップオーバー内の予約切替
+  const popoverReserveToggle = document.getElementById("popoverReserveToggle");
+  popoverReserveToggle.addEventListener("click", () => {
+    if (!activePopoverRoom) return;
+    
+    initDateDataIfNeeded(state.currentDate);
+    const dayData = state.reservations[state.currentDate];
+    const slotData = dayData[activePopoverRoom][currentMapSlot];
+    
+    slotData.reserved = !slotData.reserved;
+    if (slotData.reserved) {
+      slotData.play10 = true;
+      slotData.play1 = true;
+    }
+    
+    // チェックボックス制御の更新
+    const chk10 = document.getElementById("popoverPlay10");
+    const chk1 = document.getElementById("popoverPlay1");
+    const chkMic = document.getElementById("popoverUseMic");
+    
+    chk10.checked = slotData.play10;
+    chk1.checked = slotData.play1;
+    chkMic.checked = slotData.useMic;
+    
+    chk10.disabled = !slotData.reserved;
+    chk1.disabled = !slotData.reserved;
+    chkMic.disabled = !slotData.reserved;
+    
+    document.getElementById("popoverAudioToggles").style.opacity = slotData.reserved ? "1" : "0.5";
+    
+    saveReservations();
+    updatePopoverStatusDisplay(slotData.reserved);
+    renderScheduleGrid();
+    renderFloorMap();
+    
+    const slotStr = TIME_SLOTS.find(s => s.id === currentMapSlot).name;
+    addLog("sys", `【案内図操作】${activePopoverRoom} の ${slotStr} を ${slotData.reserved ? '予約済' : '空室'} に変更しました。`);
+  });
+
+  // ポップオーバー内自動放送チェックボックス変更
+  document.getElementById("popoverPlay10").addEventListener("change", (e) => {
+    if (!activePopoverRoom) return;
+    const dayData = state.reservations[state.currentDate];
+    const slotData = dayData[activePopoverRoom][currentMapSlot];
+    slotData.play10 = e.target.checked;
+    saveReservations();
+    renderScheduleGrid();
+    renderFloorMap();
+    const slotStr = TIME_SLOTS.find(s => s.id === currentMapSlot).name;
+    addLog("sys", `【案内図操作】${activePopoverRoom} ${slotStr} の「10分前放送」を ${slotData.play10 ? '有効' : '無効'} にしました。`);
+  });
+
+  document.getElementById("popoverPlay1").addEventListener("change", (e) => {
+    if (!activePopoverRoom) return;
+    const dayData = state.reservations[state.currentDate];
+    const slotData = dayData[activePopoverRoom][currentMapSlot];
+    slotData.play1 = e.target.checked;
+    saveReservations();
+    renderScheduleGrid();
+    renderFloorMap();
+    const slotStr = TIME_SLOTS.find(s => s.id === currentMapSlot).name;
+    addLog("sys", `【案内図操作】${activePopoverRoom} ${slotStr} の「1分前放送」を ${slotData.play1 ? '有効' : '無効'} にしました。`);
+  });
+
+  document.getElementById("popoverUseMic").addEventListener("change", (e) => {
+    if (!activePopoverRoom) return;
+    const dayData = state.reservations[state.currentDate];
+    const slotData = dayData[activePopoverRoom][currentMapSlot];
+    slotData.useMic = e.target.checked;
+    saveReservations();
+    renderScheduleGrid();
+    renderFloorMap();
+    const slotStr = TIME_SLOTS.find(s => s.id === currentMapSlot).name;
+    const volPercent = Math.round((slotData.useMic ? state.volumeMic : state.volumeNoMic) * 100);
+    addLog("sys", `【案内図操作】${activePopoverRoom} ${slotStr} の「マイク使用（音量大:${volPercent}%）」を ${slotData.useMic ? 'ON' : 'OFF'} にしました。`);
+  });
+
+  // ポップオーバー手動テスト再生
+  document.getElementById("popoverTestPlayBtn").addEventListener("click", () => {
+    if (!activePopoverRoom) return;
+    const dayData = state.reservations[state.currentDate];
+    const slotData = dayData[activePopoverRoom][currentMapSlot];
+    const volToUse = slotData.reserved && slotData.useMic ? state.volumeMic : state.volumeNoMic;
+    
+    playChime("10min", "テスト", "手動", volToUse);
+    const volPercent = Math.round(volToUse * 100);
+    addLog("manual", `「手動テスト再生（${activePopoverRoom}基準・音量:${volPercent}%）」を実行しました。`);
+  });
   
   // マイク使用時のボリュームスライダー変更
   const volSliderMic = document.getElementById("volumeSliderMic");
@@ -669,6 +1199,9 @@ function registerEventListeners() {
     state.volumeMic = parseFloat(e.target.value);
     localStorage.setItem("signsound_volume_mic", state.volumeMic);
     updateVolumeDisplay();
+    if (activePopoverRoom) {
+      openRoomPopover(activePopoverRoom);
+    }
   });
   
   // マイク非使用時のボリュームスライダー変更
@@ -677,6 +1210,9 @@ function registerEventListeners() {
     state.volumeNoMic = parseFloat(e.target.value);
     localStorage.setItem("signsound_volume_nomic", state.volumeNoMic);
     updateVolumeDisplay();
+    if (activePopoverRoom) {
+      openRoomPopover(activePopoverRoom);
+    }
   });
   
   // 手動テスト再生（マイク使用あり・音量大）
@@ -712,6 +1248,7 @@ function registerEventListeners() {
       state.currentDate = e.target.value;
       updateDateDisplay();
       renderScheduleGrid();
+      renderFloorMap();
       addLog("sys", `【表示切替】表示日を ${state.currentDate} に変更しました。`);
     }
   });
@@ -724,6 +1261,7 @@ function registerEventListeners() {
     state.currentDate = getFormattedDate(d);
     updateDateDisplay();
     renderScheduleGrid();
+    renderFloorMap();
     addLog("sys", `【表示切替】表示日を ${state.currentDate} に変更しました。`);
   });
   
@@ -735,6 +1273,7 @@ function registerEventListeners() {
     state.currentDate = getFormattedDate(d);
     updateDateDisplay();
     renderScheduleGrid();
+    renderFloorMap();
     addLog("sys", `【表示切替】表示日を ${state.currentDate} に変更しました。`);
   });
   
@@ -758,6 +1297,7 @@ function registerEventListeners() {
     });
     saveReservations();
     renderScheduleGrid();
+    renderFloorMap();
     addLog("sys", `【一括設定】${state.currentDate} の全会議室・時間枠を「予約済（自動放送有効）」に一括設定しました。`);
   });
   
@@ -772,6 +1312,7 @@ function registerEventListeners() {
     });
     saveReservations();
     renderScheduleGrid();
+    renderFloorMap();
     addLog("sys", `【一括設定】${state.currentDate} の全会議室・時間枠を「空室（自動放送無効）」に一括設定しました。`);
   });
   
@@ -782,6 +1323,7 @@ function registerEventListeners() {
       initDateDataIfNeeded(state.currentDate);
       saveReservations();
       renderScheduleGrid();
+      renderFloorMap();
       triggeredToday = {};
       addLog("sys", `【一括設定】${state.currentDate} の設定をデフォルト値（すべて空室）にリセットしました。`);
     }
@@ -791,16 +1333,13 @@ function registerEventListeners() {
   const simCheckbox = document.getElementById("simModeCheckbox");
   const simControls = document.getElementById("simControls");
   simCheckbox.addEventListener("change", (e) => {
-    simMode = e.target.checked;
-    if (simMode) {
+    const isChecked = e.target.checked;
+    if (isChecked) {
       simControls.style.opacity = "1";
       simControls.style.pointerEvents = "auto";
-      document.getElementById("clockLabel").innerText = "仮想時刻:";
-      document.getElementById("clockLabel").style.color = "var(--status-simulation)";
-      
-      setSimTimeFromInput();
-      addLog("sys", "【シミュレーター】検証用シミュレーションモードを開始しました。");
+      addLog("sys", "【シミュレーター】時間シミュレーターが有効になりました。「確定」ボタンを押すと仮想時刻が適用されます。");
     } else {
+      simMode = false;
       simControls.style.opacity = "0.5";
       simControls.style.pointerEvents = "none";
       document.getElementById("clockLabel").innerText = "現在時刻:";
@@ -811,8 +1350,20 @@ function registerEventListeners() {
       addLog("sys", "【シミュレーター】実時間モードに戻りました。");
     }
   });
+
+  // 確定ボタンクリックで仮想時間適用
+  document.getElementById("btnApplySimTime").addEventListener("click", () => {
+    if (!simCheckbox.checked) return;
+    
+    simMode = true;
+    document.getElementById("clockLabel").innerText = "仮想時刻:";
+    document.getElementById("clockLabel").style.color = "var(--status-simulation)";
+    
+    setSimTimeFromInput();
+    addLog("sys", "【シミュレーター】検証用シミュレーションモードを開始しました。");
+  });
   
-  // 仮想時刻入力変更
+  // 仮想時刻入力変更（すでにシミュレーション開始している場合のみ自動で適用）
   document.getElementById("simTimeInput").addEventListener("change", () => {
     if (simMode) {
       setSimTimeFromInput();
@@ -838,6 +1389,7 @@ function setSimTimeFromInput() {
   const parts = timeVal.split(":");
   const hours = parseInt(parts[0]);
   const minutes = parseInt(parts[1]);
+  const seconds = parts[2] ? parseInt(parts[2]) : 0;
   
   const dateParts = state.currentDate.split("-");
   
@@ -847,9 +1399,9 @@ function setSimTimeFromInput() {
     parseInt(dateParts[2]),
     hours,
     minutes,
-    0
+    seconds
   );
   
   triggeredToday = {};
-  addLog("sys", `【シミュレーター】仮想設定時刻を ${hours}時${minutes}分00秒 に設定しました。再生履歴をクリアしました。`);
+  addLog("sys", `【シミュレーター】仮想設定時刻を ${hours}時${minutes}分${String(seconds).padStart(2, '0')}秒 に設定しました。再生履歴をクリアしました。`);
 }

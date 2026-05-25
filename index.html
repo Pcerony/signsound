@@ -40,17 +40,14 @@
     <!-- 左サイドバー（ステータス、テスト、シミュレーター） -->
     <section class="sidebar">
       
-      <!-- システム状態＆起動 -->
-      <div class="card">
-        <div class="card-title">
-          <span>システム制御</span>
-          <span id="systemStatusBadge" class="status-badge status-inactive">待機中</span>
+      <!-- システム起動スイッチ -->
+      <div class="card" style="border-color: var(--secondary-color); background-color: rgba(255, 204, 0, 0.05);">
+        <div class="card-title" style="color: var(--primary-color);">🔊 システム制御（常時アクティブ）</div>
+        <div style="font-size: 0.8rem; line-height: 1.4; color: var(--text-muted); margin-bottom: 10px;">
+          本システムはページ侵入時に自動で「常時稼働」になります。画面のどこかを一度クリックすると、ブラウザの音声再生制限が自動的に解除されます。
         </div>
-        <div style="margin-bottom: 12px; font-size: 0.85rem; color: var(--text-muted);">
-          ブラウザの音声自動再生制限を解除するため、システム稼働開始時に以下のボタンを一度押してください。
-        </div>
-        <button id="btnSystemActivate" class="btn-system-activate">
-          🔊 システムを起動する
+        <button id="btnSystemActivate" class="btn-system-activate active" disabled style="cursor: default;">
+          🟢 システム稼働中（音声再生有効）
         </button>
       </div>
 
@@ -120,10 +117,11 @@
           </label>
         </div>
         <div class="sim-controls" id="simControls" style="opacity: 0.5; pointer-events: none;">
-          <div class="sim-row">
+          <div class="sim-row" style="display: flex; align-items: center; gap: 8px;">
             <span>仮想設定時刻:</span>
-            <input type="time" id="simTimeInput" class="sim-input-time" value="10:49">
-            <span style="font-size: 0.75rem; color: var(--text-muted);">秒は00固定</span>
+            <input type="time" id="simTimeInput" class="sim-input-time" value="10:49:55" step="1">
+            <button id="btnApplySimTime" class="sim-btn-apply">確定</button>
+            <span style="font-size: 0.75rem; color: var(--text-muted);">秒指定可能</span>
           </div>
           <div class="sim-row" style="margin-top: 6px;">
             <span>時間の進み方:</span>
@@ -154,10 +152,18 @@
         <button id="btnNextDay" class="date-nav-btn">次の日 ▶</button>
       </div>
 
-      <!-- 会議室一覧＆自動放送設定グリッド -->
-      <div class="card" style="padding: 20px;">
+      <!-- 表示モード切替タブ -->
+      <div class="view-mode-tabs">
+        <button id="tabListView" class="tab-btn active">📋 スケジュール一覧表</button>
+        <button id="tabMapView" class="tab-btn">🗺️ 施設案内図（マップモード）</button>
+      </div>
+
+      <!-- 会議室一覧＆自動放送設定グリッド (リスト表示) -->
+      <div id="listViewSection" class="card" style="padding: 20px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-          <h2 style="font-size: 1.2rem; font-weight: bold; color: var(--primary-color);">会議室利用・退室自動音響設定</h2>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <h2 style="font-size: 1.2rem; font-weight: bold; color: var(--primary-color); margin: 0;">会議室利用・退室自動音響設定</h2>
+          </div>
           <div class="bulk-actions">
             <button id="btnBulkReserve" class="btn-secondary">全会議室を「予約済」に設定</button>
             <button id="btnBulkVacant" class="btn-secondary">全会議室を「空室」に設定</button>
@@ -187,6 +193,46 @@
         </div>
       </div>
 
+      <!-- 施設案内図（マップモード） -->
+      <div id="mapViewSection" class="card" style="padding: 20px; display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h2 style="font-size: 1.2rem; font-weight: bold; color: var(--primary-color); margin: 0 0 4px 0;">施設内退室音響状態・案内図</h2>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">
+              福岡市南区市民会館 社会教育棟 1F・2F 平面図 (クリックで部屋の設定が可能です)
+            </div>
+          </div>
+          <div class="floor-controls-panel" style="padding: 0; border: none; box-shadow: none;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="filter-selector-label">表示時間枠:</span>
+              <select id="mapTimeSlotSelector" class="filter-select">
+                <option value="morning">午前枠 (09:00 〜 11:00)</option>
+                <option value="afternoon" selected>午後枠 (13:00 〜 15:00)</option>
+                <option value="night">夜間枠 (18:00 〜 21:00)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">
+          案内図の部屋をクリックすると、予約状況、自動放送ON/OFF、マイク使用状況（音量大・小）を直感的に管理できます。
+          利用中の部屋は <span style="color:var(--status-reserved); font-weight:bold;">赤色（予約済）</span>、空室は <span style="color:var(--status-vacant); font-weight:bold;">緑色（空室）</span> でリアルタイムに変化し、退室チャイム放送中は部屋全体が点滅します。
+        </p>
+
+        <!-- 建築平面図風レイアウト -->
+        <div id="mapFloorPlan" class="map-floor-plan" style="padding:0; overflow:hidden; max-width: 720px; margin: 0 auto; min-height: auto;">
+          <!-- JSで動的にSVGマップを生成し、配置します -->
+        </div>
+
+        <!-- 地図の凡例説明 -->
+        <div class="svg-legend-bar">
+          <div class="legend-item"><span style="display:inline-block; width:14px; height:14px; background:#e8f5e9; border:1.5px solid var(--status-vacant); border-radius:3px;"></span> 🟢 空室</div>
+          <div class="legend-item"><span style="display:inline-block; width:14px; height:14px; background:#ffebee; border:1.5px solid var(--status-reserved); border-radius:3px;"></span> 🔴 予約済 (自動放送有効)</div>
+          <div class="legend-item"><span style="display:inline-block; width:14px; height:14px; background:#eceff1; border:1.5px solid #b0bec5; border-radius:3px; border-style:dashed;"></span> 🔲 トイレ/ロビー吹抜/非管理施設</div>
+          <div class="legend-item"><span style="display:inline-block; width:14px; height:14px; background:#a5d6a7; border:1.5px solid #2e7d32; border-radius:3px; animation: svg-playing-flash 1s infinite alternate;"></span> ⚡ アナウンス放送作動中 (点滅)</div>
+        </div>
+      </div>
+
       <!-- システム動作履歴ログ -->
       <div class="card">
         <div class="card-title">
@@ -201,6 +247,49 @@
     </section>
 
   </main>
+
+  <!-- 部屋設定ポップオーバー・モーダル -->
+  <div id="roomPopoverOverlay" class="room-popover-overlay">
+    <div class="room-popover">
+      <div class="popover-header">
+        <span id="popoverRoomTitle">会議室名</span>
+        <button id="popoverCloseBtn" class="popover-close">&times;</button>
+      </div>
+      <div class="popover-body">
+        
+        <!-- 予約状況 -->
+        <div>
+          <span style="font-size: 0.85rem; font-weight: bold; display: block; margin-bottom: 6px;">利用・予約状況:</span>
+          <button id="popoverReserveToggle" class="btn-reserve-toggle vacant" style="width: 100%;">
+            🟢 空室 (利用なし)
+          </button>
+        </div>
+
+        <!-- 音響スイッチ -->
+        <div class="audio-toggles" id="popoverAudioToggles" style="opacity: 0.5; padding: 10px; border: 1px solid var(--border-light); background: #fdfdfd; border-radius: 4px;">
+          <span style="font-size: 0.85rem; font-weight: bold; margin-bottom: 6px; display: block; color: var(--primary-color);">自動放送スイッチ:</span>
+          <label class="audio-toggle-label" style="margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+            <input type="checkbox" id="popoverPlay10" disabled> 10分前放送
+          </label>
+          <label class="audio-toggle-label" style="margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+            <input type="checkbox" id="popoverPlay1" disabled> 1分前放送
+          </label>
+          <label class="audio-toggle-label" style="color: var(--status-reserved); font-weight: bold; margin-top: 6px; border-top: 1px dashed var(--border-light); padding-top: 6px; width: 100%; display: flex; align-items: center; gap: 6px;">
+            <input type="checkbox" id="popoverUseMic" disabled> 🎤 マイク使用 (音量大)
+          </label>
+        </div>
+
+        <!-- 手動テストボタン -->
+        <div style="border-top: 1px solid var(--border-light); padding-top: 12px; display: flex; flex-direction: column; gap: 8px;">
+          <span style="font-size: 0.85rem; font-weight: bold; color: var(--text-muted);">この部屋の動作確認:</span>
+          <button id="popoverTestPlayBtn" class="btn-system-activate" style="font-size: 0.9rem; padding: 8px; background-color: var(--primary-color);">
+            🔊 手動テスト再生
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
 
   <footer style="text-align: center; font-size: 0.8rem; color: var(--text-muted); padding: 20px 0; border-top: 1px solid var(--border-light); background-color: #ffffff; margin-top: 40px;">
     福岡市南区市民会館 - 退室案内自動放送管理システム v1.0.0 (ローカル動作環境)
