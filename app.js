@@ -170,14 +170,16 @@ function loadFromLocalStorage() {
     const val = parseFloat(savedVolumeMic);
     state.volumeMic = val <= 1.0 ? 75 : val;
   }
-  document.getElementById("volumeSliderMic").value = state.volumeMic;
+  const sliderMic = document.getElementById("volumeSliderMic");
+  if (sliderMic) sliderMic.value = state.volumeMic;
 
   const savedVolumeNoMic = localStorage.getItem("signsound_volume_nomic");
   if (savedVolumeNoMic !== null) {
     const val = parseFloat(savedVolumeNoMic);
     state.volumeNoMic = val <= 1.0 ? 70 : val;
   }
-  document.getElementById("volumeSliderNoMic").value = state.volumeNoMic;
+  const sliderNoMic = document.getElementById("volumeSliderNoMic");
+  if (sliderNoMic) sliderNoMic.value = state.volumeNoMic;
   
   const savedLogs = localStorage.getItem("signsound_logs");
   if (savedLogs) {
@@ -384,30 +386,108 @@ function renderScheduleGrid() {
       label1.appendChild(document.createTextNode(" 1分前放送"));
       togglesDiv.appendChild(label1);
       
-      // 🎤 マイク使用チェックボックス
-      const labelMic = document.createElement("label");
-      labelMic.className = "audio-toggle-label";
-      labelMic.style.color = "var(--status-reserved)";
-      labelMic.style.fontWeight = "bold";
-      labelMic.style.marginTop = "4px";
-      labelMic.style.borderTop = "1px dashed var(--border-light)";
-      labelMic.style.paddingTop = "4px";
+      // 🎤 マイク使用 二選一セレクタ (ボタン形式)
+      const selectDiv = document.createElement("div");
+      selectDiv.style.marginTop = "8px";
+      selectDiv.style.borderTop = "1px dashed var(--border-light)";
+      selectDiv.style.paddingTop = "8px";
+      selectDiv.style.width = "100%";
       
-      const chkMic = document.createElement("input");
-      chkMic.type = "checkbox";
-      chkMic.checked = slotData.useMic;
-      chkMic.disabled = !slotData.reserved;
-      chkMic.addEventListener("change", (e) => {
-        slotData.useMic = e.target.checked;
+      const labelMic = document.createElement("span");
+      labelMic.style.fontSize = "0.75rem";
+      labelMic.style.fontWeight = "bold";
+      labelMic.style.color = "var(--text-main)";
+      labelMic.style.display = "block";
+      labelMic.style.marginBottom = "4px";
+      labelMic.style.textAlign = "left";
+      labelMic.innerText = "マイク使用設定:";
+      selectDiv.appendChild(labelMic);
+      
+      const btnContainer = document.createElement("div");
+      btnContainer.style.display = "flex";
+      btnContainer.style.backgroundColor = "#f1f3f5";
+      btnContainer.style.padding = "2px";
+      btnContainer.style.borderRadius = "6px";
+      btnContainer.style.width = "100%";
+      btnContainer.style.boxSizing = "border-box";
+      
+      const btnNoMic = document.createElement("button");
+      btnNoMic.type = "button";
+      btnNoMic.style.flex = "1";
+      btnNoMic.style.textAlign = "center";
+      btnNoMic.style.border = "none";
+      btnNoMic.style.padding = "4px 2px";
+      btnNoMic.style.fontSize = "0.7rem";
+      btnNoMic.style.fontWeight = "bold";
+      btnNoMic.style.borderRadius = "4px";
+      btnNoMic.style.cursor = slotData.reserved ? "pointer" : "default";
+      btnNoMic.style.transition = "all 0.2s";
+      btnNoMic.innerText = "🔇 非使用 (70dB)";
+      btnNoMic.disabled = !slotData.reserved;
+      
+      const btnMic = document.createElement("button");
+      btnMic.type = "button";
+      btnMic.style.flex = "1";
+      btnMic.style.textAlign = "center";
+      btnMic.style.border = "none";
+      btnMic.style.padding = "4px 2px";
+      btnMic.style.fontSize = "0.7rem";
+      btnMic.style.fontWeight = "bold";
+      btnMic.style.borderRadius = "4px";
+      btnMic.style.cursor = slotData.reserved ? "pointer" : "default";
+      btnMic.style.transition = "all 0.2s";
+      btnMic.innerText = "🎤 使用 (75dB)";
+      btnMic.disabled = !slotData.reserved;
+      
+      // ボタンのスタイル更新
+      if (!slotData.reserved) {
+        btnNoMic.style.backgroundColor = "#e9ecef";
+        btnNoMic.style.color = "#6c757d";
+        btnNoMic.style.boxShadow = "none";
+        
+        btnMic.style.backgroundColor = "#e9ecef";
+        btnMic.style.color = "#6c757d";
+        btnMic.style.boxShadow = "none";
+      } else if (slotData.useMic) {
+        btnNoMic.style.backgroundColor = "transparent";
+        btnNoMic.style.color = "#495057";
+        btnNoMic.style.boxShadow = "none";
+        
+        btnMic.style.backgroundColor = "var(--status-reserved)";
+        btnMic.style.color = "#ffffff";
+        btnMic.style.boxShadow = "0 1px 3px rgba(0,0,0,0.15)";
+      } else {
+        btnNoMic.style.backgroundColor = "#ffffff";
+        btnNoMic.style.color = "var(--primary-color)";
+        btnNoMic.style.boxShadow = "0 1px 3px rgba(0,0,0,0.15)";
+        
+        btnMic.style.backgroundColor = "transparent";
+        btnMic.style.color = "#495057";
+        btnMic.style.boxShadow = "none";
+      }
+      
+      btnNoMic.addEventListener("click", () => {
+        if (!slotData.reserved) return;
+        slotData.useMic = false;
         saveReservations();
         renderScheduleGrid();
         renderFloorMap();
-        const volDb = slotData.useMic ? state.volumeMic : state.volumeNoMic;
-        addLog("sys", `【設定変更】${room} ${slot.name} の「マイク使用（音量大:${volDb}dB）」を ${slotData.useMic ? 'ON' : 'OFF'} にしました。`);
+        addLog("sys", `【設定変更】${room} ${slot.name} の設定を「マイク非使用 (70dB)」にしました。`);
       });
-      labelMic.appendChild(chkMic);
-      labelMic.appendChild(document.createTextNode(" 🎤 マイク使用 (大)"));
-      togglesDiv.appendChild(labelMic);
+      
+      btnMic.addEventListener("click", () => {
+        if (!slotData.reserved) return;
+        slotData.useMic = true;
+        saveReservations();
+        renderScheduleGrid();
+        renderFloorMap();
+        addLog("sys", `【設定変更】${room} ${slot.name} の設定を「マイク使用 (75dB)」にしました。`);
+      });
+      
+      btnContainer.appendChild(btnNoMic);
+      btnContainer.appendChild(btnMic);
+      selectDiv.appendChild(btnContainer);
+      togglesDiv.appendChild(selectDiv);
       
       innerDiv.appendChild(togglesDiv);
       td.appendChild(innerDiv);
@@ -659,15 +739,18 @@ function openRoomPopover(roomName) {
   // チェックボックス類の反映
   const chk10 = document.getElementById("popoverPlay10");
   const chk1 = document.getElementById("popoverPlay1");
-  const chkMic = document.getElementById("popoverUseMic");
+  const btnMicNo = document.getElementById("popoverMicNo");
+  const btnMicYes = document.getElementById("popoverMicYes");
   
   chk10.checked = slotData.play10;
   chk1.checked = slotData.play1;
-  chkMic.checked = slotData.useMic;
   
   chk10.disabled = !slotData.reserved;
   chk1.disabled = !slotData.reserved;
-  chkMic.disabled = !slotData.reserved;
+  btnMicNo.disabled = !slotData.reserved;
+  btnMicYes.disabled = !slotData.reserved;
+  
+  updatePopoverMicButtonsDisplay(slotData.useMic, slotData.reserved);
   
   document.getElementById("popoverAudioToggles").style.opacity = slotData.reserved ? "1" : "0.5";
   
@@ -691,9 +774,44 @@ function updatePopoverStatusDisplay(isReserved) {
   }
 }
 
+function updatePopoverMicButtonsDisplay(useMic, isReserved) {
+  const btnMicNo = document.getElementById("popoverMicNo");
+  const btnMicYes = document.getElementById("popoverMicYes");
+  
+  if (!btnMicNo || !btnMicYes) return;
+  
+  if (!isReserved) {
+    btnMicNo.style.backgroundColor = "#e9ecef";
+    btnMicNo.style.color = "#6c757d";
+    btnMicNo.style.boxShadow = "none";
+    
+    btnMicYes.style.backgroundColor = "#e9ecef";
+    btnMicYes.style.color = "#6c757d";
+    btnMicYes.style.boxShadow = "none";
+    return;
+  }
+  
+  if (useMic) {
+    btnMicNo.style.backgroundColor = "transparent";
+    btnMicNo.style.color = "#495057";
+    btnMicNo.style.boxShadow = "none";
+    
+    btnMicYes.style.backgroundColor = "var(--status-reserved)";
+    btnMicYes.style.color = "#ffffff";
+    btnMicYes.style.boxShadow = "0 1px 3px rgba(0,0,0,0.15)";
+  } else {
+    btnMicNo.style.backgroundColor = "#ffffff";
+    btnMicNo.style.color = "var(--primary-color)";
+    btnMicNo.style.boxShadow = "0 1px 3px rgba(0,0,0,0.15)";
+    
+    btnMicYes.style.backgroundColor = "transparent";
+    btnMicYes.style.color = "#495057";
+    btnMicYes.style.boxShadow = "none";
+  }
+}
+
 function updateVolumeDisplay() {
-  document.getElementById("volumeValueMic").innerText = `${state.volumeMic}dB`;
-  document.getElementById("volumeValueNoMic").innerText = `${state.volumeNoMic}dB`;
+  // 音量表示は無効化
 }
 
 // 6. 音響エンジン (Audio Engine)
@@ -989,7 +1107,68 @@ function updateCountdown() {
   const timeDisplay = document.getElementById("countdownTime");
   const nextTriggerLabel = document.getElementById("countdownNextTrigger");
   
+  const upcomingListContainer = document.getElementById("upcomingListContainer");
+  const upcomingList = document.getElementById("upcomingList");
+  
   if (candidates.length > 0) {
+    // 時間順（近い順）に並び替え
+    candidates.sort((a, b) => a.diffSeconds - b.diffSeconds);
+    
+    // リストの描画
+    if (upcomingListContainer && upcomingList) {
+      upcomingList.innerHTML = "";
+      candidates.forEach(c => {
+        const mm = String(Math.floor(c.diffSeconds / 60)).padStart(2, '0');
+        const ss = String(c.diffSeconds % 60).padStart(2, '0');
+        
+        const itemDiv = document.createElement("div");
+        itemDiv.style.display = "flex";
+        itemDiv.style.justifyContent = "space-between";
+        itemDiv.style.alignItems = "center";
+        itemDiv.style.background = "#ffffff";
+        itemDiv.style.border = "1px solid var(--border-light)";
+        itemDiv.style.padding = "6px 8px";
+        itemDiv.style.borderRadius = "4px";
+        itemDiv.style.fontSize = "0.75rem";
+        itemDiv.style.boxShadow = "0 1px 2px rgba(0,0,0,0.02)";
+        
+        const infoDiv = document.createElement("div");
+        infoDiv.innerHTML = `<strong style="color: var(--primary-color);">${c.room}</strong> <span style="color: var(--text-muted); font-size: 0.7rem;">(${c.slotName}・${c.type})</span>`;
+        itemDiv.appendChild(infoDiv);
+        
+        const badgeDiv = document.createElement("div");
+        badgeDiv.style.display = "flex";
+        badgeDiv.style.alignItems = "center";
+        badgeDiv.style.gap = "6px";
+        
+        const volBadge = document.createElement("span");
+        volBadge.style.fontSize = "0.7rem";
+        volBadge.style.padding = "2px 4px";
+        volBadge.style.borderRadius = "3px";
+        if (c.useMic) {
+          volBadge.style.background = "#ffebee";
+          volBadge.style.color = "var(--status-reserved)";
+          volBadge.innerText = `🎤 75dB`;
+        } else {
+          volBadge.style.background = "#e8f5e9";
+          volBadge.style.color = "var(--status-vacant)";
+          volBadge.innerText = `🔇 70dB`;
+        }
+        volBadge.style.fontWeight = "bold";
+        badgeDiv.appendChild(volBadge);
+        
+        const timeBadge = document.createElement("span");
+        timeBadge.style.fontWeight = "bold";
+        timeBadge.style.color = "var(--status-simulation)";
+        timeBadge.innerText = `あと ${mm}:${ss}`;
+        badgeDiv.appendChild(timeBadge);
+        
+        itemDiv.appendChild(badgeDiv);
+        upcomingList.appendChild(itemDiv);
+      });
+      upcomingListContainer.style.display = "block";
+    }
+
     // 最も近い秒数を探す
     let minSec = Infinity;
     candidates.forEach(c => {
@@ -1028,6 +1207,9 @@ function updateCountdown() {
   timeDisplay.innerText = "--:--";
   nextTriggerLabel.innerText = "予約状況または放送スイッチを確認してください";
   countdownBox.style.backgroundColor = "#f5f5f5";
+  if (upcomingListContainer) {
+    upcomingListContainer.style.display = "none";
+  }
 }
 
 // 9. ログ管理処理
@@ -1165,18 +1347,21 @@ function registerEventListeners() {
       slotData.play1 = true;
     }
     
-    // チェックボックス制御の更新
+    // コントロール類の有効無効と状態反映
     const chk10 = document.getElementById("popoverPlay10");
     const chk1 = document.getElementById("popoverPlay1");
-    const chkMic = document.getElementById("popoverUseMic");
+    const btnMicNo = document.getElementById("popoverMicNo");
+    const btnMicYes = document.getElementById("popoverMicYes");
     
     chk10.checked = slotData.play10;
     chk1.checked = slotData.play1;
-    chkMic.checked = slotData.useMic;
     
     chk10.disabled = !slotData.reserved;
     chk1.disabled = !slotData.reserved;
-    chkMic.disabled = !slotData.reserved;
+    btnMicNo.disabled = !slotData.reserved;
+    btnMicYes.disabled = !slotData.reserved;
+    
+    updatePopoverMicButtonsDisplay(slotData.useMic, slotData.reserved);
     
     document.getElementById("popoverAudioToggles").style.opacity = slotData.reserved ? "1" : "0.5";
     
@@ -1214,17 +1399,37 @@ function registerEventListeners() {
     addLog("sys", `【案内図操作】${activePopoverRoom} ${slotStr} の「1分前放送」を ${slotData.play1 ? '有効' : '無効'} にしました。`);
   });
 
-  document.getElementById("popoverUseMic").addEventListener("change", (e) => {
+  // ポップオーバー内マイク設定切り替え（二者択一）
+  document.getElementById("popoverMicNo").addEventListener("click", () => {
     if (!activePopoverRoom) return;
     const dayData = state.reservations[state.currentDate];
     const slotData = dayData[activePopoverRoom][currentMapSlot];
-    slotData.useMic = e.target.checked;
+    if (!slotData.reserved) return;
+    
+    slotData.useMic = false;
     saveReservations();
+    updatePopoverMicButtonsDisplay(false, true);
     renderScheduleGrid();
     renderFloorMap();
+    
     const slotStr = TIME_SLOTS.find(s => s.id === currentMapSlot).name;
-    const volDb = slotData.useMic ? state.volumeMic : state.volumeNoMic;
-    addLog("sys", `【案内図操作】${activePopoverRoom} ${slotStr} の「マイク使用（音量大:${volDb}dB）」を ${slotData.useMic ? 'ON' : 'OFF'} にしました。`);
+    addLog("sys", `【案内図操作】${activePopoverRoom} ${slotStr} を「マイク非使用 (70dB)」に設定しました。`);
+  });
+
+  document.getElementById("popoverMicYes").addEventListener("click", () => {
+    if (!activePopoverRoom) return;
+    const dayData = state.reservations[state.currentDate];
+    const slotData = dayData[activePopoverRoom][currentMapSlot];
+    if (!slotData.reserved) return;
+    
+    slotData.useMic = true;
+    saveReservations();
+    updatePopoverMicButtonsDisplay(true, true);
+    renderScheduleGrid();
+    renderFloorMap();
+    
+    const slotStr = TIME_SLOTS.find(s => s.id === currentMapSlot).name;
+    addLog("sys", `【案内図操作】${activePopoverRoom} ${slotStr} を「マイク使用 (75dB)」に設定しました。`);
   });
 
   // ポップオーバー手動テスト再生
@@ -1237,54 +1442,6 @@ function registerEventListeners() {
     playChime("10min", "テスト", "手動", volToUse);
     const volDb = volToUse;
     addLog("manual", `「手動テスト再生（${activePopoverRoom}基準・音量:${volDb}dB）」を実行しました。`);
-  });
-  
-  // マイク使用時のボリュームスライダー変更
-  const volSliderMic = document.getElementById("volumeSliderMic");
-  volSliderMic.addEventListener("input", (e) => {
-    state.volumeMic = parseFloat(e.target.value);
-    localStorage.setItem("signsound_volume_mic", state.volumeMic);
-    updateVolumeDisplay();
-    if (activePopoverRoom) {
-      openRoomPopover(activePopoverRoom);
-    }
-  });
-  
-  // マイク非使用時のボリュームスライダー変更
-  const volSliderNoMic = document.getElementById("volumeSliderNoMic");
-  volSliderNoMic.addEventListener("input", (e) => {
-    state.volumeNoMic = parseFloat(e.target.value);
-    localStorage.setItem("signsound_volume_nomic", state.volumeNoMic);
-    updateVolumeDisplay();
-    if (activePopoverRoom) {
-      openRoomPopover(activePopoverRoom);
-    }
-  });
-  
-  // 手動テスト再生（マイク使用あり・音量大）
-  document.getElementById("btnTest10MinMic").addEventListener("click", () => {
-    playChime("10min", "テスト", "手動", state.volumeMic);
-    const volDb = state.volumeMic;
-    addLog("manual", `「10分前予告音（マイク使用中・音量大:${volDb}dB）」の手動テスト再生を実行しました。`);
-  });
-  
-  document.getElementById("btnTest1MinMic").addEventListener("click", () => {
-    playChime("1min", "テスト", "手動", state.volumeMic);
-    const volDb = state.volumeMic;
-    addLog("manual", `「1分前予告音（マイク使用中・音量大:${volDb}dB）」の手動テスト再生を実行しました。`);
-  });
-
-  // 手動テスト再生（マイクなし・音量小）
-  document.getElementById("btnTest10MinNoMic").addEventListener("click", () => {
-    playChime("10min", "テスト", "手動", state.volumeNoMic);
-    const volDb = state.volumeNoMic;
-    addLog("manual", `「10分前予告音（マイクなし・音量小:${volDb}dB）」の手動テスト再生を実行しました。`);
-  });
-  
-  document.getElementById("btnTest1MinNoMic").addEventListener("click", () => {
-    playChime("1min", "テスト", "手動", state.volumeNoMic);
-    const volDb = state.volumeNoMic;
-    addLog("manual", `「1分前予告音（マイクなし・音量小:${volDb}dB）」の手動テスト再生を実行しました。`);
   });
   
   // 日付ピッカーの操作

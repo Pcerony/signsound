@@ -59,50 +59,18 @@
           <div class="countdown-time" id="countdownTime">--:--:--</div>
           <div class="countdown-desc" id="countdownNextTrigger">--分前放送に備えています</div>
         </div>
-      </div>
-
-      <!-- 音声出力テスト＆音量設定 -->
-      <div class="card">
-        <div class="card-title">音声出力テスト（マイク使用状況別）</div>
-        
-        <!-- マイク使用時 (音量大) -->
-        <div style="margin-bottom: 12px; border-bottom: 1px dashed var(--border-color); padding-bottom: 12px;">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-            <span style="font-size: 0.85rem; font-weight: bold; color: var(--status-reserved);">🎤 マイク使用中 (音量大):</span>
-            <span id="volumeValueMic" style="font-size: 0.85rem; font-weight: bold; color: var(--status-reserved);">75dB</span>
+        <!-- 今後放送予定の部屋リスト -->
+        <div class="upcoming-list-container" id="upcomingListContainer" style="margin-top: 14px; border-top: 1px dashed var(--border-color); padding-top: 12px; display: none;">
+          <div style="font-size: 0.8rem; font-weight: bold; color: var(--text-main); margin-bottom: 8px;">
+            📋 これからの放送予定一覧:
           </div>
-          <div class="volume-control" style="margin-bottom: 8px;">
-            <input type="range" id="volumeSliderMic" class="volume-slider" min="50" max="90" step="1" value="75">
-          </div>
-          <div class="test-play-grid">
-            <button id="btnTest10MinMic" class="btn-play-test" style="border-color: var(--status-reserved); color: var(--status-reserved);" title="マイク使用中（音量大）の10分前チャイムをテスト再生します">
-              🔊 10分前 (大)
-            </button>
-            <button id="btnTest1MinMic" class="btn-play-test" style="border-color: var(--status-reserved); color: var(--status-reserved);" title="マイク使用中（音量大）の1分前チャイムをテスト再生します">
-              🔊 1分前 (大)
-            </button>
-          </div>
-        </div>
-
-        <!-- マイク非使用時 (音量小) -->
-        <div>
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-            <span style="font-size: 0.85rem; font-weight: bold; color: var(--primary-color);">🔇 マイク非使用 (音量小):</span>
-            <span id="volumeValueNoMic" style="font-size: 0.85rem; font-weight: bold; color: var(--primary-color);">70dB</span>
-          </div>
-          <div class="volume-control" style="margin-bottom: 8px;">
-            <input type="range" id="volumeSliderNoMic" class="volume-slider" min="50" max="90" step="1" value="70">
-          </div>
-          <div class="test-play-grid">
-            <button id="btnTest10MinNoMic" class="btn-play-test" style="border-color: var(--primary-color); color: var(--primary-color);" title="マイク非使用（音量小）の10分前チャイムをテスト再生します">
-              🔉 10分前 (小)
-            </button>
-            <button id="btnTest1MinNoMic" class="btn-play-test" style="border-color: var(--primary-color); color: var(--primary-color);" title="マイク非使用（音量小）の1分前チャイムをテスト再生します">
-              🔉 1分前 (小)
-            </button>
+          <div id="upcomingList" style="display: flex; flex-direction: column; gap: 6px; max-height: 160px; overflow-y: auto; padding-right: 4px;">
+            <!-- リストアイテムが動的に挿入されます -->
           </div>
         </div>
       </div>
+
+
 
       <!-- テスト用仮想時間シミュレーター -->
       <div class="card sim-panel">
@@ -274,9 +242,17 @@
           <label class="audio-toggle-label" style="margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
             <input type="checkbox" id="popoverPlay1" disabled> 1分前放送
           </label>
-          <label class="audio-toggle-label" style="color: var(--status-reserved); font-weight: bold; margin-top: 6px; border-top: 1px dashed var(--border-light); padding-top: 6px; width: 100%; display: flex; align-items: center; gap: 6px;">
-            <input type="checkbox" id="popoverUseMic" disabled> 🎤 マイク使用 (音量大)
-          </label>
+          <div style="margin-top: 10px; border-top: 1px dashed var(--border-light); padding-top: 8px; width: 100%;">
+            <span style="font-size: 0.8rem; font-weight: bold; color: var(--text-main); display: block; margin-bottom: 6px;">マイク使用設定:</span>
+            <div class="popover-mic-selector" style="display: flex; background-color: #f1f3f5; padding: 2px; border-radius: 6px; width: 100%;">
+              <button type="button" id="popoverMicNo" class="mic-choice-btn" style="flex: 1; text-align: center; border: none; padding: 6px; font-size: 0.75rem; font-weight: bold; border-radius: 4px; cursor: pointer; transition: all 0.2s;" disabled>
+                🔇 マイク非使用 (70dB)
+              </button>
+              <button type="button" id="popoverMicYes" class="mic-choice-btn" style="flex: 1; text-align: center; border: none; padding: 6px; font-size: 0.75rem; font-weight: bold; border-radius: 4px; cursor: pointer; transition: all 0.2s;" disabled>
+                🎤 マイク使用 (75dB)
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- 手動テストボタン -->
