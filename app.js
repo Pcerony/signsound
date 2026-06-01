@@ -3,7 +3,7 @@
 // 1. 定数定義（全18部屋の構成データ。そのうち特定の10部屋のみが管理対象）
 const ROOMS_CONFIG = [
   // 1階 社会教育棟
-  { name: "和室", floor: "1F", wing: "social", type: "meeting", managed: true },
+  { name: "和室", floor: "1F", wing: "social", type: "meeting", managed: false },
   { name: "託児室", floor: "1F", wing: "social", type: "other", managed: false },
   { name: "会議室5", floor: "1F", wing: "social", type: "meeting", managed: true },
   
@@ -31,7 +31,7 @@ const ROOMS_CONFIG = [
   { name: "中練習室", floor: "2F", wing: "central", type: "practice", managed: false }
 ];
 
-// 管理対象のみ（和室、会議室1-5、実習室1-2、研修室、視聴覚室）
+// 管理対象のみ（会議室1-5、実習室1-2、研修室、視聴覚室）
 const DEFAULT_ROOMS = ROOMS_CONFIG.filter(r => r.managed).map(r => r.name);
 
 const TIME_SLOTS = [
@@ -220,9 +220,6 @@ function initDateDataIfNeeded(dateStr) {
 
   // デモンストレーション用初期データのシード (新規日付作成時のみ適用)
   if (isNewDate) {
-    // 1. 和室: 午前枠 (マイクなし・小音量)
-    state.reservations[dateStr]["和室"]["morning"].reserved = true;
-    
     // 2. 会議室5: 午前枠 (マイクなし・小音量), 午後枠 (マイクなし)
     state.reservations[dateStr]["会議室5"]["morning"].reserved = true;
     state.reservations[dateStr]["会議室5"]["afternoon"].reserved = true;
@@ -454,8 +451,11 @@ function renderFloorMap() {
         <text x="97" y="105" font-size="9" fill="#90a4ae" text-anchor="middle">女子・男子・多目的</text>
       </g>
       
-      <!-- 和室 (管理対象) -->
-      ${renderSvgRoom("和室", "rect", { x: 165, y: 35, width: 60, height: 110, rx: 3 }, dayData)}
+      <!-- 和室 (非管理対象) -->
+      <g class="svg-room non-managed">
+        <rect x="165" y="35" width="60" height="110" rx="3" />
+        <text x="195" y="94" font-size="11" font-weight="bold" fill="#78909c" text-anchor="middle">和室</text>
+      </g>
       
       <!-- 会議室5 (管理対象) -->
       ${renderSvgRoom("会議室5", "rect", { x: 35, y: 150, width: 70, height: 70, rx: 3 }, dayData)}
