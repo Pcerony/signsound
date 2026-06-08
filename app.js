@@ -42,8 +42,8 @@ const TIME_SLOTS = [
 
 // 音声ファイルへのパス (相対パス)
 const AUDIO_PATHS = {
-  "10min": "アーカイブ 3/10分前v2.wav",
-  "1min": "アーカイブ 3/1分前v2.wav"
+  "10min": "archive_3/10min.wav",
+  "1min": "archive_3/1min.wav"
 };
 
 // 2. 状態変数 (State)
