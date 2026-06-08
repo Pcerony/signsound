@@ -63,6 +63,7 @@ let simMode = false;
 let simSpeed = 1;
 let triggeredToday = {}; // { "YYYY-MM-DD_room_slot_type": true } (当日再生済みのトリガー重複防止)
 let expandedSlots = {};  // 各セルの詳細設定メニュー開閉状態 { "部屋名_slotId": true/false }
+let lastCleanupHash = ""; // 清掃待確認リストの差分検出用ハッシュ
 
 // フィルタ・マップ状態
 let gridFilter = "all";           // "all" | "1F" | "2F"
@@ -98,6 +99,7 @@ window.addEventListener("DOMContentLoaded", () => {
   renderFloorMap();
   updateVolumeDisplay();
   renderLogs();
+  updateCleanupList();
   
   // イベントリスナーの登録
   registerEventListeners();
@@ -304,17 +306,36 @@ function renderScheduleGrid() {
       // 予約ステータスボタン
       const btn = document.createElement("button");
       btn.className = `btn-reserve-toggle ${slotData.reserved ? 'reserved' : 'vacant'}`;
-      btn.innerText = slotData.reserved ? "🔴 予約済 (利用中)" : "🟢 空室 (利用なし)";
+      
+      if (slotData.reserved) {
+        const ended = hasSlotEnded(slot, state.currentDate, systemTime);
+        if (ended) {
+          btn.innerText = slotData.cleaned ? "🔴 終了 (🧹清掃済)" : "🔴 終了 (🧹清掃待ち)";
+          if (slotData.cleaned) {
+            btn.style.borderColor = "var(--status-vacant)"; // 緑色のボーダー
+          } else {
+            btn.style.borderColor = "var(--status-reserved)"; // 赤色のボーダー
+          }
+        } else {
+          btn.innerText = "🔴 予約済 (利用中)";
+          btn.style.borderColor = "";
+        }
+      } else {
+        btn.innerText = "🟢 空室 (利用なし)";
+        btn.style.borderColor = "";
+      }
       
       btn.addEventListener("click", () => {
         slotData.reserved = !slotData.reserved;
         if (slotData.reserved) {
           slotData.play10 = true;
           slotData.play1 = true;
+          slotData.cleaned = false; // 新規予約時は清掃フラグをリセット
         }
         saveReservations();
         renderScheduleGrid();
         renderFloorMap();
+        updateCleanupList();
         addLog("sys", `【設定変更】${room} の ${slot.name} を ${slotData.reserved ? '予約済' : '空室'} に変更しました。`);
       });
       
@@ -700,10 +721,17 @@ function renderSvgRoom(roomName, svgTag, attrs, dayData) {
   if (slotData.useMic === undefined) slotData.useMic = false;
   if (slotData.play1 === undefined) slotData.play1 = true;
   
-  // 予約状態に応じたCSSクラス決定
+  // 予約状態および終了状態に応じたCSSクラス決定
   let statusClass = "vacant";
+  const slot = TIME_SLOTS.find(s => s.id === currentMapSlot);
+  const ended = hasSlotEnded(slot, state.currentDate, systemTime);
+  
   if (slotData.reserved) {
-    statusClass = "reserved";
+    if (ended) {
+      statusClass = slotData.cleaned ? "ended-cleaned" : "ended-pending";
+    } else {
+      statusClass = "reserved";
+    }
   }
   
   // 自動放送作動中の点滅ID
@@ -732,13 +760,17 @@ function renderSvgRoom(roomName, svgTag, attrs, dayData) {
   let memoIcon = "";
   
   if (slotData.reserved) {
-    let chkText = "";
-    if (slotData.play10 && slotData.play1) chkText = "自動放送:ON";
-    else if (slotData.play10) chkText = "10分前のみ";
-    else if (slotData.play1) chkText = "1分前のみ";
-    else chkText = "放送OFF";
-    
-    statusText = `利用中 (${chkText})`;
+    if (ended) {
+      statusText = slotData.cleaned ? "利用終了 (🧹清掃済)" : "利用終了 (🧹清掃待ち)";
+    } else {
+      let chkText = "";
+      if (slotData.play10 && slotData.play1) chkText = "自動放送:ON";
+      else if (slotData.play10) chkText = "10分前のみ";
+      else if (slotData.play1) chkText = "1分前のみ";
+      else chkText = "放送OFF";
+      
+      statusText = `利用中 (${chkText})`;
+    }
     micText = slotData.useMic ? "🎤大音量" : "🔇小音量";
     if (slotData.memo && slotData.memo.trim() !== "") {
       memoIcon = " 📝";
@@ -757,7 +789,7 @@ function renderSvgRoom(roomName, svgTag, attrs, dayData) {
   
   // マイク音量インジケータ（利用中のみ表示）
   let micBadgeElement = "";
-  if (slotData.reserved) {
+  if (slotData.reserved && !ended) {
     const badgeColor = slotData.useMic ? "var(--status-reserved)" : "var(--primary-color)";
     micBadgeElement = `
       <g transform="translate(${cx - 30}, ${cy + 22})" style="pointer-events: none;">
@@ -818,6 +850,24 @@ function openRoomPopover(roomName) {
   updatePopoverMicButtonsDisplay(slotData.useMic, slotData.reserved);
   
   document.getElementById("popoverAudioToggles").style.opacity = slotData.reserved ? "1" : "0.5";
+  
+  // 清掃確認エリアの表示制御
+  const cleanupSec = document.getElementById("popoverCleanupSection");
+  const cleanupToggle = document.getElementById("popoverCleanupToggle");
+  const ended = hasSlotEnded(TIME_SLOTS.find(s => s.id === currentMapSlot), state.currentDate, systemTime);
+  
+  if (slotData.reserved && ended) {
+    cleanupSec.style.display = "block";
+    if (slotData.cleaned) {
+      cleanupToggle.innerText = "🟢 清掃完了済 (未清掃に戻す)";
+      cleanupToggle.className = "btn-cleanup-confirm cleaned";
+    } else {
+      cleanupToggle.innerText = "🧹 清掃完了を確認する";
+      cleanupToggle.className = "btn-cleanup-confirm";
+    }
+  } else {
+    cleanupSec.style.display = "none";
+  }
   
   // モーダル展開
   document.getElementById("roomPopoverOverlay").classList.add("active");
@@ -1039,6 +1089,9 @@ function tick() {
   
   // カウントダウン表示の更新
   updateCountdown();
+  
+  // 清掃待確認リストの更新
+  updateCleanupList();
 }
 
 function updateClockDisplay() {
@@ -1428,6 +1481,26 @@ function registerEventListeners() {
     
     saveReservations();
     updatePopoverStatusDisplay(slotData.reserved);
+    
+    // 清掃確認エリアの表示制御
+    const cleanupSec = document.getElementById("popoverCleanupSection");
+    const cleanupToggle = document.getElementById("popoverCleanupToggle");
+    const ended = hasSlotEnded(TIME_SLOTS.find(s => s.id === currentMapSlot), state.currentDate, systemTime);
+    
+    if (slotData.reserved && ended) {
+      cleanupSec.style.display = "block";
+      if (slotData.cleaned) {
+        cleanupToggle.innerText = "🟢 清掃完了済 (未清掃に戻す)";
+        cleanupToggle.className = "btn-cleanup-confirm cleaned";
+      } else {
+        cleanupToggle.innerText = "🧹 清掃完了を確認する";
+        cleanupToggle.className = "btn-cleanup-confirm";
+      }
+    } else {
+      cleanupSec.style.display = "none";
+    }
+    
+    updateCleanupList();
     renderScheduleGrid();
     renderFloorMap();
     
@@ -1506,6 +1579,26 @@ function registerEventListeners() {
     renderFloorMap();
   });
 
+  // ポップオーバー内清掃確認切替
+  document.getElementById("popoverCleanupToggle").addEventListener("click", () => {
+    if (!activePopoverRoom) return;
+    const dayData = state.reservations[state.currentDate];
+    const slotData = dayData[activePopoverRoom][currentMapSlot];
+    if (!slotData.reserved) return;
+    
+    slotData.cleaned = !slotData.cleaned;
+    saveReservations();
+    updateCleanupList();
+    renderScheduleGrid();
+    renderFloorMap();
+    
+    // ポップオーバー表示の再更新
+    openRoomPopover(activePopoverRoom);
+    
+    const slotStr = TIME_SLOTS.find(s => s.id === currentMapSlot).name;
+    addLog("sys", `【清掃確認】${activePopoverRoom} の ${slotStr} の清掃状態を「${slotData.cleaned ? '完了' : '未完了'}」に変更しました。`);
+  });
+
   // ポップオーバー手動テスト再生
   document.getElementById("popoverTestPlayBtn").addEventListener("click", () => {
     if (!activePopoverRoom) return;
@@ -1526,6 +1619,7 @@ function registerEventListeners() {
       updateDateDisplay();
       renderScheduleGrid();
       renderFloorMap();
+      updateCleanupList();
       addLog("sys", `【表示切替】表示日を ${state.currentDate} に変更しました。`);
     }
   });
@@ -1539,6 +1633,7 @@ function registerEventListeners() {
     updateDateDisplay();
     renderScheduleGrid();
     renderFloorMap();
+    updateCleanupList();
     addLog("sys", `【表示切替】表示日を ${state.currentDate} に変更しました。`);
   });
   
@@ -1551,6 +1646,7 @@ function registerEventListeners() {
     updateDateDisplay();
     renderScheduleGrid();
     renderFloorMap();
+    updateCleanupList();
     addLog("sys", `【表示切替】表示日を ${state.currentDate} に変更しました。`);
   });
   
@@ -1682,3 +1778,101 @@ function setSimTimeFromInput() {
   triggeredToday = {};
   addLog("sys", `【シミュレーター】仮想設定時刻を ${hours}時${minutes}分${String(seconds).padStart(2, '0')}秒 に設定しました。再生履歴をクリアしました。`);
 }
+
+// スロットが終了したかどうか判定するヘルパー
+function hasSlotEnded(slot, dateStr, currentTime) {
+  const todayStr = getFormattedDate(currentTime);
+  if (dateStr < todayStr) {
+    return true; // 過去日付
+  }
+  if (dateStr > todayStr) {
+    return false; // 未来日付
+  }
+  // 本日の日付：現在時刻（分換算）が終了時刻（分換算）以降か
+  const currentMinutes = currentTime.getHours() * 60 + currentTime.getMinutes() + currentTime.getSeconds() / 60;
+  return currentMinutes >= slot.endMin;
+}
+
+// 待確認の清掃リストを更新
+function updateCleanupList() {
+  const cleanupList = document.getElementById("cleanupList");
+  if (!cleanupList) return;
+  
+  initDateDataIfNeeded(state.currentDate);
+  const dayData = state.reservations[state.currentDate];
+  
+  const pendingCleanups = [];
+  
+  // 管理対象のすべての部屋とスロットを走査
+  const managedRooms = ROOMS_CONFIG.filter(r => r.managed);
+  managedRooms.forEach(roomObj => {
+    const roomName = roomObj.name;
+    TIME_SLOTS.forEach(slot => {
+      const slotData = dayData[roomName][slot.id];
+      if (slotData && slotData.reserved) {
+        const ended = hasSlotEnded(slot, state.currentDate, systemTime);
+        const cleaned = slotData.cleaned || false;
+        if (ended && !cleaned) {
+          pendingCleanups.push({
+            roomName,
+            slotId: slot.id,
+            slotName: slot.name,
+            slotStart: slot.start,
+            slotEnd: slot.end
+          });
+        }
+      }
+    });
+  });
+  
+  // ハッシュによる無駄なDOM更新の防止
+  const cleanupHash = JSON.stringify(pendingCleanups);
+  if (cleanupHash === lastCleanupHash) return;
+  lastCleanupHash = cleanupHash;
+  
+  if (pendingCleanups.length === 0) {
+    cleanupList.innerHTML = `
+      <div style="font-size: 0.85rem; color: var(--status-vacant); text-align: center; padding: 12px; font-weight: bold;">
+        🟢 全ての部屋の清掃確認が完了しています
+      </div>
+    `;
+    return;
+  }
+  
+  cleanupList.innerHTML = "";
+  pendingCleanups.forEach(item => {
+    const itemDiv = document.createElement("div");
+    itemDiv.className = "cleanup-item";
+    
+    itemDiv.innerHTML = `
+      <div style="display: flex; flex-direction: column; gap: 2px; text-align: left;">
+        <span style="font-size: 0.85rem; font-weight: bold; color: var(--status-reserved);">${item.roomName}</span>
+        <span style="font-size: 0.75rem; color: var(--text-muted);">${item.slotName} (${item.slotStart}〜${item.slotEnd} 終了)</span>
+      </div>
+      <button class="btn-cleanup-confirm" onclick="confirmCleanup('${item.roomName}', '${item.slotId}')">
+        確認
+      </button>
+    `;
+    cleanupList.appendChild(itemDiv);
+  });
+}
+
+// 清掃完了を確定するグローバル関数
+window.confirmCleanup = function(roomName, slotId) {
+  initDateDataIfNeeded(state.currentDate);
+  const dayData = state.reservations[state.currentDate];
+  const slotData = dayData[roomName][slotId];
+  if (slotData) {
+    slotData.cleaned = true;
+    saveReservations();
+    renderScheduleGrid();
+    renderFloorMap();
+    updateCleanupList();
+    addLog("sys", `【清掃確認】${roomName} の ${TIME_SLOTS.find(s => s.id === slotId).name} の清掃完了を確認しました。`);
+    
+    // ポップオーバーが開いていれば更新
+    if (activePopoverRoom === roomName && currentMapSlot === slotId) {
+      openRoomPopover(roomName);
+    }
+  }
+};

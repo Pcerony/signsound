@@ -71,6 +71,19 @@
         </div>
       </div>
 
+      <!-- 清掃・退室確認待ちリスト -->
+      <div class="card">
+        <div class="card-title">🧹 清掃・退室確認待ち</div>
+        <div style="font-size: 0.8rem; line-height: 1.4; color: var(--text-muted); margin-bottom: 10px;">
+          利用時間が終了した部屋です。清掃と次枠の準備が完了したら「確認」ボタンを押してください。
+        </div>
+        <div id="cleanupList" style="display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; padding-right: 4px;">
+          <div style="font-size: 0.85rem; color: var(--status-vacant); text-align: center; padding: 12px; font-weight: bold;">
+            🟢 全ての部屋の清掃確認が完了しています
+          </div>
+        </div>
+      </div>
+
 
 
       <!-- テスト用仮想時間シミュレーター -->
@@ -231,6 +244,14 @@
           <span style="font-size: 0.85rem; font-weight: bold; display: block; margin-bottom: 6px;">利用・予約状況:</span>
           <button id="popoverReserveToggle" class="btn-reserve-toggle vacant" style="width: 100%;">
             🟢 空室 (利用なし)
+          </button>
+        </div>
+
+        <!-- 清掃状況（利用終了時のみ表示） -->
+        <div id="popoverCleanupSection" style="margin-top: 10px; display: none;">
+          <span style="font-size: 0.85rem; font-weight: bold; display: block; margin-bottom: 6px;">清掃・準備状況:</span>
+          <button type="button" id="popoverCleanupToggle" class="btn-cleanup-confirm" style="width: 100%; padding: 8px; font-size: 0.85rem;">
+            🧹 清掃完了を確認する
           </button>
         </div>
 

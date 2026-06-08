@@ -433,8 +433,52 @@ body {
   transition: transform 0.3s ease;
 }
 
-.btn-detail-toggle:hover .gear-icon {
-  transform: rotate(60deg);
+/* 清掃確認ボタンのスタイル */
+.btn-cleanup-confirm {
+  background-color: var(--status-vacant);
+  color: #ffffff;
+  border: 1px solid var(--status-vacant);
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-cleanup-confirm:hover {
+  background-color: #2e7d32;
+  border-color: #2e7d32;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
+.btn-cleanup-confirm.cleaned {
+  background-color: #e8f5e9;
+  color: var(--status-vacant);
+  border-color: var(--status-vacant);
+}
+
+.btn-cleanup-confirm.cleaned:hover {
+  background-color: #c8e6c9;
+}
+
+/* 清掃待確認リストの個別カード */
+.cleanup-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #fff8f8;
+  border: 1px solid #ffcdd2;
+  padding: 8px 10px;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  transition: all 0.2s ease;
+}
+
+.cleanup-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  border-color: #ef9a9a;
 }
 
 /* 会議室全体・当日全体の一括操作 */
@@ -1045,6 +1089,30 @@ body {
   fill: #ffcdd2 !important;
 }
 
+.svg-room.ended-cleaned rect,
+.svg-room.ended-cleaned path {
+  fill: #e8f5e9 !important;
+  stroke: var(--status-vacant) !important;
+  stroke-width: 3px !important;
+}
+
+.svg-room.ended-cleaned:hover rect,
+.svg-room.ended-cleaned:hover path {
+  fill: #c8e6c9 !important;
+}
+
+.svg-room.ended-pending rect,
+.svg-room.ended-pending path {
+  fill: #ffebee !important;
+  stroke: var(--status-reserved) !important;
+  stroke-width: 3px !important;
+}
+
+.svg-room.ended-pending:hover rect,
+.svg-room.ended-pending:hover path {
+  fill: #ffcdd2 !important;
+}
+
 /* 放送中点滅アニメーション (SVG対応) */
 .svg-room.playing-now rect,
 .svg-room.playing-now path {
@@ -1071,6 +1139,16 @@ body {
   fill: var(--status-reserved);
 }
 
+/* 清掃完了した部屋テキスト */
+.svg-room.ended-cleaned .svg-room-text {
+  fill: var(--status-vacant);
+}
+
+/* 清掃待ちの部屋テキスト */
+.svg-room.ended-pending .svg-room-text {
+  fill: var(--status-reserved);
+}
+
 /* 空室の部屋テキスト */
 .svg-room.vacant .svg-room-text {
   fill: var(--status-vacant);
@@ -1085,6 +1163,16 @@ body {
 }
 
 .svg-room.reserved .svg-room-status-text {
+  fill: #b71c1c;
+  font-weight: bold;
+}
+
+.svg-room.ended-cleaned .svg-room-status-text {
+  fill: #1b5e20;
+  font-weight: bold;
+}
+
+.svg-room.ended-pending .svg-room-status-text {
   fill: #b71c1c;
   font-weight: bold;
 }
