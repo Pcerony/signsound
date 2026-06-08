@@ -320,7 +320,11 @@ function renderScheduleGrid() {
       
       innerDiv.appendChild(btn);
       
-      // 自動放送トグル
+      // 自動放送トグルコンテナ（アコーディオンアニメーション用）
+      const togglesContainer = document.createElement("div");
+      togglesContainer.className = "audio-toggles-container";
+
+      // 自動放送トグル本体
       const togglesDiv = document.createElement("div");
       togglesDiv.className = "audio-toggles";
       
@@ -332,9 +336,12 @@ function renderScheduleGrid() {
         toggleDetailBtn.className = "btn-detail-toggle";
         if (expandedSlots[slotKey]) {
           toggleDetailBtn.classList.add("expanded");
-          togglesDiv.classList.add("expanded");
+          togglesContainer.classList.add("expanded");
         }
-        toggleDetailBtn.innerHTML = `詳細設定 <span class="gear-icon">⚙️</span> <span class="arrow-icon">▼</span>`;
+        
+        // ロゴをモチーフにしたカスタム矢印SVG（ロゴの上半分「\ /」のシェイプ）
+        const svgArrow = `<svg class="arrow-icon" viewBox="0 0 100 65" style="width: 10px; height: 6.5px; display: inline-block; vertical-align: middle; transition: transform 0.25s ease;"><path d="M 15 15 L 50 50 L 85 15" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none" /></svg>`;
+        toggleDetailBtn.innerHTML = `詳細設定 <span class="gear-icon">⚙️</span> ${svgArrow}`;
         
         toggleDetailBtn.addEventListener("click", (e) => {
           e.stopPropagation();
@@ -343,10 +350,10 @@ function renderScheduleGrid() {
           
           if (isExpanded) {
             toggleDetailBtn.classList.add("expanded");
-            togglesDiv.classList.add("expanded");
+            togglesContainer.classList.add("expanded");
           } else {
             toggleDetailBtn.classList.remove("expanded");
-            togglesDiv.classList.remove("expanded");
+            togglesContainer.classList.remove("expanded");
           }
         });
         
@@ -408,6 +415,8 @@ function renderScheduleGrid() {
       
       const btnContainer = document.createElement("div");
       btnContainer.style.display = "flex";
+      btnContainer.style.flexDirection = "column";
+      btnContainer.style.gap = "2px";
       btnContainer.style.backgroundColor = "#f1f3f5";
       btnContainer.style.padding = "2px";
       btnContainer.style.borderRadius = "6px";
@@ -416,11 +425,11 @@ function renderScheduleGrid() {
       
       const btnNoMic = document.createElement("button");
       btnNoMic.type = "button";
-      btnNoMic.style.flex = "1";
+      btnNoMic.style.width = "100%";
       btnNoMic.style.textAlign = "center";
       btnNoMic.style.border = "none";
-      btnNoMic.style.padding = "4px 2px";
-      btnNoMic.style.fontSize = "0.7rem";
+      btnNoMic.style.padding = "6px 4px";
+      btnNoMic.style.fontSize = "0.75rem";
       btnNoMic.style.fontWeight = "bold";
       btnNoMic.style.borderRadius = "4px";
       btnNoMic.style.cursor = slotData.reserved ? "pointer" : "default";
@@ -430,11 +439,11 @@ function renderScheduleGrid() {
       
       const btnMic = document.createElement("button");
       btnMic.type = "button";
-      btnMic.style.flex = "1";
+      btnMic.style.width = "100%";
       btnMic.style.textAlign = "center";
       btnMic.style.border = "none";
-      btnMic.style.padding = "4px 2px";
-      btnMic.style.fontSize = "0.7rem";
+      btnMic.style.padding = "6px 4px";
+      btnMic.style.fontSize = "0.75rem";
       btnMic.style.fontWeight = "bold";
       btnMic.style.borderRadius = "4px";
       btnMic.style.cursor = slotData.reserved ? "pointer" : "default";
@@ -492,7 +501,8 @@ function renderScheduleGrid() {
       selectDiv.appendChild(btnContainer);
       togglesDiv.appendChild(selectDiv);
       
-      innerDiv.appendChild(togglesDiv);
+      togglesContainer.appendChild(togglesDiv);
+      innerDiv.appendChild(togglesContainer);
       td.appendChild(innerDiv);
       tr.appendChild(td);
     });

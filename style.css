@@ -266,9 +266,11 @@ body {
 
 .schedule-table {
   width: 100%;
+  min-width: 780px;
   border-collapse: collapse;
   background-color: #ffffff;
   border: 2px solid var(--primary-color);
+  table-layout: fixed;
 }
 
 .schedule-table th, .schedule-table td {
@@ -351,26 +353,29 @@ body {
   width: 100%;
 }
 
-/* スケジュール管理テーブル内のみのアコーディオン展開アニメーション */
-.schedule-table .audio-toggles {
-  max-height: 0;
-  opacity: 0;
+/* スケジュール管理テーブル内のみのアコーディオン展開アニメーション (CSS Gridを使用した高度な高さアニメーション) */
+.schedule-table .audio-toggles-container {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s cubic-bezier(0.4, 0, 0.2, 1), margin-top 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
-  visibility: hidden;
-  padding: 0 10px;
-  border-color: transparent;
-  margin-top: 0;
-  transition: max-height 0.25s ease-out, opacity 0.25s ease-out, padding 0.25s ease-out, margin-top 0.25s ease-out, border-color 0.25s ease-out, visibility 0.25s ease-out;
+  width: 100%;
 }
 
-.schedule-table .audio-toggles.expanded {
-  max-height: 180px;
-  opacity: 1;
-  visibility: visible;
-  padding: 10px;
-  border-color: var(--border-light);
+.schedule-table .audio-toggles-container.expanded {
+  grid-template-rows: 1fr;
   margin-top: 6px;
+}
+
+.schedule-table .audio-toggles {
+  min-height: 0;
+  opacity: 0;
   background: #fdfdfd;
+  transition: opacity 0.25s ease-out;
+}
+
+.schedule-table .audio-toggles-container.expanded .audio-toggles {
+  opacity: 1;
 }
 
 .audio-toggle-label {
@@ -413,8 +418,10 @@ body {
 
 .btn-detail-toggle .arrow-icon {
   display: inline-block;
-  transition: transform 0.2s ease;
-  font-size: 0.65rem;
+  transition: transform 0.25s ease;
+  width: 10px;
+  height: 6.5px;
+  vertical-align: middle;
 }
 
 .btn-detail-toggle.expanded .arrow-icon {
