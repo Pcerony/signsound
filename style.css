@@ -351,6 +351,28 @@ body {
   width: 100%;
 }
 
+/* スケジュール管理テーブル内のみのアコーディオン展開アニメーション */
+.schedule-table .audio-toggles {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  visibility: hidden;
+  padding: 0 10px;
+  border-color: transparent;
+  margin-top: 0;
+  transition: max-height 0.25s ease-out, opacity 0.25s ease-out, padding 0.25s ease-out, margin-top 0.25s ease-out, border-color 0.25s ease-out, visibility 0.25s ease-out;
+}
+
+.schedule-table .audio-toggles.expanded {
+  max-height: 180px;
+  opacity: 1;
+  visibility: visible;
+  padding: 10px;
+  border-color: var(--border-light);
+  margin-top: 6px;
+  background: #fdfdfd;
+}
+
 .audio-toggle-label {
   display: flex;
   align-items: center;
@@ -361,6 +383,51 @@ body {
 
 .audio-toggle-label input[type="checkbox"] {
   cursor: pointer;
+}
+
+/* アコーディオン展開ボタン */
+.btn-detail-toggle {
+  background-color: #ffffff;
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  margin-top: 4px;
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.btn-detail-toggle:hover {
+  background-color: #f0f4f8;
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+.btn-detail-toggle .arrow-icon {
+  display: inline-block;
+  transition: transform 0.2s ease;
+  font-size: 0.65rem;
+}
+
+.btn-detail-toggle.expanded .arrow-icon {
+  transform: rotate(180deg);
+}
+
+.btn-detail-toggle .gear-icon {
+  display: inline-block;
+  transition: transform 0.3s ease;
+}
+
+.btn-detail-toggle:hover .gear-icon {
+  transform: rotate(60deg);
 }
 
 /* 会議室全体・当日全体の一括操作 */

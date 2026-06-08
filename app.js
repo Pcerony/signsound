@@ -320,41 +320,39 @@ function renderScheduleGrid() {
       
       innerDiv.appendChild(btn);
       
+      // 自動放送トグル
+      const togglesDiv = document.createElement("div");
+      togglesDiv.className = "audio-toggles";
+      
       // 詳細設定アコーディオンボタン（予約済のときのみ表示）
       const slotKey = `${room}_${slot.id}`;
       if (slotData.reserved) {
         const toggleDetailBtn = document.createElement("button");
         toggleDetailBtn.type = "button";
-        toggleDetailBtn.className = "btn-secondary";
-        toggleDetailBtn.style.padding = "2px 6px";
-        toggleDetailBtn.style.fontSize = "0.75rem";
-        toggleDetailBtn.style.marginTop = "4px";
-        toggleDetailBtn.style.width = "100%";
-        toggleDetailBtn.innerText = expandedSlots[slotKey] ? "設定を閉じる ▲" : "詳細設定 ⚙️ ▼";
+        toggleDetailBtn.className = "btn-detail-toggle";
+        if (expandedSlots[slotKey]) {
+          toggleDetailBtn.classList.add("expanded");
+          togglesDiv.classList.add("expanded");
+        }
+        toggleDetailBtn.innerHTML = `詳細設定 <span class="gear-icon">⚙️</span> <span class="arrow-icon">▼</span>`;
         
         toggleDetailBtn.addEventListener("click", (e) => {
           e.stopPropagation();
-          expandedSlots[slotKey] = !expandedSlots[slotKey];
-          renderScheduleGrid();
+          const isExpanded = !expandedSlots[slotKey];
+          expandedSlots[slotKey] = isExpanded;
+          
+          if (isExpanded) {
+            toggleDetailBtn.classList.add("expanded");
+            togglesDiv.classList.add("expanded");
+          } else {
+            toggleDetailBtn.classList.remove("expanded");
+            togglesDiv.classList.remove("expanded");
+          }
         });
         
         innerDiv.appendChild(toggleDetailBtn);
       } else {
         expandedSlots[slotKey] = false;
-      }
-      
-      // 自動放送トグル
-      const togglesDiv = document.createElement("div");
-      togglesDiv.className = "audio-toggles";
-      if (!slotData.reserved) {
-        togglesDiv.style.opacity = "0.5";
-      }
-      
-      // 開閉状態に応じた表示非表示切り替え
-      if (slotData.reserved && expandedSlots[slotKey]) {
-        togglesDiv.style.display = "flex";
-      } else {
-        togglesDiv.style.display = "none";
       }
       
       // 10分前チェックボックス
