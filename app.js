@@ -50,7 +50,7 @@ const AUDIO_PATHS = {
 let state = {
   currentDate: "",          // "YYYY-MM-DD" フォーマット
   reservations: {},         // { "YYYY-MM-DD": { "部屋名": { "slotId": { reserved: bool, play10: bool, play1: bool, useMic: bool } } } }
-  isSystemActivated: true,  // ブラウザ音声アンロック状態（初期状態で強制オン）
+  isSystemActivated: false, // ブラウザ音声アンロック状態（初期状態で解除待ち）
   volumeMic: 70,            // マイク使用時の音量 (70dB)
   volumeNoMic: 65,          // マイク非使用時の音量 (65dB)
   logs: []
@@ -87,12 +87,9 @@ window.addEventListener("DOMContentLoaded", () => {
   // ローカルストレージからロード
   loadFromLocalStorage();
   
-  // システム制御を初期状態で強制アクティブ化
-  activateSystemAutomatically();
-  
   // 日付ピッカーの初期値設定
   const datePicker = document.getElementById("datePicker");
-  datePicker.value = todayStr;
+  if (datePicker) datePicker.value = todayStr;
   
   // 画面表示更新
   updateDateDisplay();
@@ -107,21 +104,9 @@ window.addEventListener("DOMContentLoaded", () => {
   // 1秒に1回動くメインループ開始
   setInterval(tick, 100); // 高精度シミュレーションのために100ms周期でチェック
 
-  // 透過的なブラウザ音声制限解除（画面のどこかをクリックした際に自動でAudioContextをアンロック）
+  // 透過的なブラウザ音声制限解除（画面のどこかをクリックした際に自動でAudioContextおよび本番用Audioオブジェクトをアンロック）
   const unlockAudioOnFirstClick = () => {
-    const context = new (window.AudioContext || window.webkitAudioContext)();
-    if (context.state === 'suspended') {
-      context.resume();
-    }
-    
-    // ダミーの極小音量再生によるブラウザ制限解除
-    const temp1 = new Audio(AUDIO_PATHS["10min"]);
-    const temp2 = new Audio(AUDIO_PATHS["1min"]);
-    temp1.volume = 0.001;
-    temp2.volume = 0.001;
-    temp1.play().then(() => temp1.pause()).catch(() => {});
-    temp2.play().then(() => temp2.pause()).catch(() => {});
-    
+    initAudioContextUnlock();
     document.removeEventListener("click", unlockAudioOnFirstClick);
     document.removeEventListener("touchstart", unlockAudioOnFirstClick);
   };
@@ -812,44 +797,32 @@ function initAudioContextUnlock() {
     context.resume();
   }
   
-  const temp1 = new Audio(AUDIO_PATHS["10min"]);
-  const temp2 = new Audio(AUDIO_PATHS["1min"]);
-  temp1.volume = 0.01;
-  temp2.volume = 0.01;
-  
-  const playPromise1 = temp1.play();
-  if (playPromise1 !== undefined) {
-    playPromise1.then(() => {
-      temp1.pause();
-    }).catch(err => {
-      console.log("Audio unlock debug 1: ", err);
-    });
-  }
-  
-  const playPromise2 = temp2.play();
-  if (playPromise2 !== undefined) {
-    playPromise2.then(() => {
-      temp2.pause();
-    }).catch(err => {
-      console.log("Audio unlock debug 2: ", err);
-    });
+  // 本番用Audio要素をユーザーアクション内でダミー再生して、発声権限を確実に取得
+  if (audioElements["10min"] && audioElements["1min"]) {
+    const origVol10 = audioElements["10min"].volume;
+    const origVol1 = audioElements["1min"].volume;
+    
+    // 一時的に音量を極小にしてダミー再生し、発声権限を確実に取得する
+    audioElements["10min"].volume = 0.001;
+    audioElements["1min"].volume = 0.001;
+    
+    audioElements["10min"].play()
+      .then(() => {
+        audioElements["10min"].pause();
+        audioElements["10min"].currentTime = 0;
+        audioElements["10min"].volume = origVol10;
+      })
+      .catch(err => console.log("Unlock 10min failed:", err));
+      
+    audioElements["1min"].play()
+      .then(() => {
+        audioElements["1min"].pause();
+        audioElements["1min"].currentTime = 0;
+        audioElements["1min"].volume = origVol1;
+      })
+      .catch(err => console.log("Unlock 1min failed:", err));
   }
 
-  state.isSystemActivated = true;
-  
-  const badge = document.getElementById("systemStatusBadge");
-  badge.className = "status-badge status-active";
-  badge.innerText = "稼働中";
-  
-  const btn = document.getElementById("btnSystemActivate");
-  btn.className = "btn-system-activate active";
-  btn.innerHTML = "🟢 システム稼働中（音声再生有効）";
-  
-  addLog("sys", "【システム】会議室利用終了お知らせチャイム管理システムを起動しました。自動音声再生が有効です。");
-}
-
-// システム自動有効化処理 (強制オン)
-function activateSystemAutomatically() {
   state.isSystemActivated = true;
   
   const badge = document.getElementById("systemStatusBadge");
@@ -861,10 +834,12 @@ function activateSystemAutomatically() {
   const btn = document.getElementById("btnSystemActivate");
   if (btn) {
     btn.className = "btn-system-activate active";
-    btn.innerHTML = "🟢 システム稼働中（音声再生有効・自動起動済）";
-    btn.disabled = true; // 手動操作は不要
+    btn.innerHTML = "🟢 システム稼働中（音声再生有効）";
+    btn.disabled = true; // 活性化後は手動操作不要
     btn.style.cursor = "default";
   }
+  
+  addLog("sys", "【システム】会議室利用終了お知らせチャイム管理システムを起動しました。自動音声再生が有効です。");
 }
 
 // dB値をHTML5 Audioのリニア音量(0.0〜1.0)に変換するヘルパー
