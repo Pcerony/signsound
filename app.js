@@ -341,7 +341,9 @@ function renderScheduleGrid() {
         
         // ロゴをモチーフにしたカスタム矢印SVG（ロゴの上半分「\ /」のシェイプ）
         const svgArrow = `<svg class="arrow-icon" viewBox="0 0 100 65" style="width: 10px; height: 6.5px; display: inline-block; vertical-align: middle; transition: transform 0.25s ease;"><path d="M 15 15 L 50 50 L 85 15" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none" /></svg>`;
-        toggleDetailBtn.innerHTML = `詳細設定 <span class="gear-icon">⚙️</span> ${svgArrow}`;
+        const hasMemo = slotData.memo && slotData.memo.trim() !== "";
+        const memoBadge = hasMemo ? `<span style="font-size: 0.75rem; margin-left: 2px;" title="${slotData.memo}">📝</span>` : "";
+        toggleDetailBtn.innerHTML = `詳細設定 <span class="gear-icon">⚙️</span>${memoBadge} ${svgArrow}`;
         
         toggleDetailBtn.addEventListener("click", (e) => {
           e.stopPropagation();
@@ -500,6 +502,49 @@ function renderScheduleGrid() {
       btnContainer.appendChild(btnMic);
       selectDiv.appendChild(btnContainer);
       togglesDiv.appendChild(selectDiv);
+      
+      // スタッフ用備考・メモのテキスト入力欄
+      const memoDiv = document.createElement("div");
+      memoDiv.style.marginTop = "8px";
+      memoDiv.style.borderTop = "1px dashed var(--border-light)";
+      memoDiv.style.paddingTop = "8px";
+      memoDiv.style.width = "100%";
+      
+      const labelMemo = document.createElement("span");
+      labelMemo.style.fontSize = "0.75rem";
+      labelMemo.style.fontWeight = "bold";
+      labelMemo.style.color = "var(--text-main)";
+      labelMemo.style.display = "block";
+      labelMemo.style.marginBottom = "4px";
+      labelMemo.style.textAlign = "left";
+      labelMemo.innerText = "スタッフ備考・メモ:";
+      memoDiv.appendChild(labelMemo);
+      
+      const inputMemo = document.createElement("input");
+      inputMemo.type = "text";
+      inputMemo.value = slotData.memo || "";
+      inputMemo.placeholder = "メモを入力...";
+      inputMemo.disabled = !slotData.reserved;
+      inputMemo.style.width = "100%";
+      inputMemo.style.padding = "4px 6px";
+      inputMemo.style.fontSize = "0.75rem";
+      inputMemo.style.border = "1px solid var(--border-color)";
+      inputMemo.style.borderRadius = "4px";
+      inputMemo.style.outline = "none";
+      inputMemo.style.boxSizing = "border-box";
+      
+      inputMemo.addEventListener("input", (e) => {
+        slotData.memo = e.target.value;
+        saveReservations();
+        renderFloorMap(); // マップをリアルタイムで同期
+      });
+      
+      inputMemo.addEventListener("blur", () => {
+        renderScheduleGrid(); // フォーカスを失った時に再描画し、詳細設定ボタンのメモバッジ（📝）を反映
+      });
+      
+      memoDiv.appendChild(inputMemo);
+      togglesDiv.appendChild(memoDiv);
       
       togglesContainer.appendChild(togglesDiv);
       innerDiv.appendChild(togglesContainer);
@@ -684,6 +729,7 @@ function renderSvgRoom(roomName, svgTag, attrs, dayData) {
   // 状態テキスト
   let statusText = "空室";
   let micText = "";
+  let memoIcon = "";
   
   if (slotData.reserved) {
     let chkText = "";
@@ -694,6 +740,9 @@ function renderSvgRoom(roomName, svgTag, attrs, dayData) {
     
     statusText = `利用中 (${chkText})`;
     micText = slotData.useMic ? "🎤大音量" : "🔇小音量";
+    if (slotData.memo && slotData.memo.trim() !== "") {
+      memoIcon = " 📝";
+    }
   }
   
   // 手動クリックイベント呼び出し
@@ -721,7 +770,7 @@ function renderSvgRoom(roomName, svgTag, attrs, dayData) {
   return `
     <g class="svg-room managed ${statusClass}" id="${elementId}" ${onclickStr}>
       ${shapeElement}
-      <text x="${cx}" y="${cy - 5}" class="svg-room-text">${roomName}</text>
+      <text x="${cx}" y="${cy - 5}" class="svg-room-text">${roomName}${memoIcon}</text>
       <text x="${cx}" y="${cy + 12}" class="svg-room-status-text">${statusText}</text>
       ${micBadgeElement}
     </g>
@@ -754,14 +803,17 @@ function openRoomPopover(roomName) {
   const chk1 = document.getElementById("popoverPlay1");
   const btnMicNo = document.getElementById("popoverMicNo");
   const btnMicYes = document.getElementById("popoverMicYes");
+  const popoverMemo = document.getElementById("popoverMemo");
   
   chk10.checked = slotData.play10;
   chk1.checked = slotData.play1;
+  popoverMemo.value = slotData.memo || "";
   
   chk10.disabled = !slotData.reserved;
   chk1.disabled = !slotData.reserved;
   btnMicNo.disabled = !slotData.reserved;
   btnMicYes.disabled = !slotData.reserved;
+  popoverMemo.disabled = !slotData.reserved;
   
   updatePopoverMicButtonsDisplay(slotData.useMic, slotData.reserved);
   
@@ -1355,14 +1407,20 @@ function registerEventListeners() {
     const chk1 = document.getElementById("popoverPlay1");
     const btnMicNo = document.getElementById("popoverMicNo");
     const btnMicYes = document.getElementById("popoverMicYes");
+    const popoverMemo = document.getElementById("popoverMemo");
     
     chk10.checked = slotData.play10;
     chk1.checked = slotData.play1;
+    if (!slotData.reserved) {
+      slotData.memo = "";
+      popoverMemo.value = "";
+    }
     
     chk10.disabled = !slotData.reserved;
     chk1.disabled = !slotData.reserved;
     btnMicNo.disabled = !slotData.reserved;
     btnMicYes.disabled = !slotData.reserved;
+    popoverMemo.disabled = !slotData.reserved;
     
     updatePopoverMicButtonsDisplay(slotData.useMic, slotData.reserved);
     
@@ -1433,6 +1491,19 @@ function registerEventListeners() {
     
     const slotStr = TIME_SLOTS.find(s => s.id === currentMapSlot).name;
     addLog("sys", `【案内図操作】${activePopoverRoom} ${slotStr} を「マイク使用 (70dB)」に設定しました。`);
+  });
+
+  // ポップオーバー内備考欄変更
+  document.getElementById("popoverMemo").addEventListener("input", (e) => {
+    if (!activePopoverRoom) return;
+    const dayData = state.reservations[state.currentDate];
+    const slotData = dayData[activePopoverRoom][currentMapSlot];
+    if (!slotData.reserved) return;
+    
+    slotData.memo = e.target.value;
+    saveReservations();
+    renderScheduleGrid();
+    renderFloorMap();
   });
 
   // ポップオーバー手動テスト再生
