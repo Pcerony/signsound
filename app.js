@@ -165,21 +165,10 @@ function loadFromLocalStorage() {
     }
   }
   
-  const savedVolumeMic = localStorage.getItem("signsound_volume_mic");
-  if (savedVolumeMic !== null) {
-    const val = parseFloat(savedVolumeMic);
-    state.volumeMic = val <= 1.0 ? 70 : val;
-  }
-  const sliderMic = document.getElementById("volumeSliderMic");
-  if (sliderMic) sliderMic.value = state.volumeMic;
-
-  const savedVolumeNoMic = localStorage.getItem("signsound_volume_nomic");
-  if (savedVolumeNoMic !== null) {
-    const val = parseFloat(savedVolumeNoMic);
-    state.volumeNoMic = val <= 1.0 ? 65 : val;
-  }
-  const sliderNoMic = document.getElementById("volumeSliderNoMic");
-  if (sliderNoMic) sliderNoMic.value = state.volumeNoMic;
+  // 音量スライダーの廃止に伴い、固定設定音量(マイク使用時70dB / 非使用時65dB)を使用するため
+  // 古いローカルストレージのデータをクリーンアップします
+  localStorage.removeItem("signsound_volume_mic");
+  localStorage.removeItem("signsound_volume_nomic");
   
   const savedLogs = localStorage.getItem("signsound_logs");
   if (savedLogs) {
