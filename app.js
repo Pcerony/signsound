@@ -62,6 +62,7 @@ let lastRealTime = Date.now();
 let simMode = false;
 let simSpeed = 1;
 let triggeredToday = {}; // { "YYYY-MM-DD_room_slot_type": true } (当日再生済みのトリガー重複防止)
+let expandedSlots = {};  // 各セルの詳細設定メニュー開閉状態 { "部屋名_slotId": true/false }
 
 // フィルタ・マップ状態
 let gridFilter = "all";           // "all" | "1F" | "2F"
@@ -319,11 +320,41 @@ function renderScheduleGrid() {
       
       innerDiv.appendChild(btn);
       
+      // 詳細設定アコーディオンボタン（予約済のときのみ表示）
+      const slotKey = `${room}_${slot.id}`;
+      if (slotData.reserved) {
+        const toggleDetailBtn = document.createElement("button");
+        toggleDetailBtn.type = "button";
+        toggleDetailBtn.className = "btn-secondary";
+        toggleDetailBtn.style.padding = "2px 6px";
+        toggleDetailBtn.style.fontSize = "0.75rem";
+        toggleDetailBtn.style.marginTop = "4px";
+        toggleDetailBtn.style.width = "100%";
+        toggleDetailBtn.innerText = expandedSlots[slotKey] ? "設定を閉じる ▲" : "詳細設定 ⚙️ ▼";
+        
+        toggleDetailBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          expandedSlots[slotKey] = !expandedSlots[slotKey];
+          renderScheduleGrid();
+        });
+        
+        innerDiv.appendChild(toggleDetailBtn);
+      } else {
+        expandedSlots[slotKey] = false;
+      }
+      
       // 自動放送トグル
       const togglesDiv = document.createElement("div");
       togglesDiv.className = "audio-toggles";
       if (!slotData.reserved) {
         togglesDiv.style.opacity = "0.5";
+      }
+      
+      // 開閉状態に応じた表示非表示切り替え
+      if (slotData.reserved && expandedSlots[slotKey]) {
+        togglesDiv.style.display = "flex";
+      } else {
+        togglesDiv.style.display = "none";
       }
       
       // 10分前チェックボックス
