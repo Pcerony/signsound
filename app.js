@@ -51,8 +51,8 @@ let state = {
   currentDate: "",          // "YYYY-MM-DD" フォーマット
   reservations: {},         // { "YYYY-MM-DD": { "部屋名": { "slotId": { reserved: bool, play10: bool, play1: bool, useMic: bool } } } }
   isSystemActivated: true,  // ブラウザ音声アンロック状態（初期状態で強制オン）
-  volumeMic: 75,            // マイク使用時の音量 (75dB)
-  volumeNoMic: 70,          // マイク非使用時の音量 (70dB)
+  volumeMic: 70,            // マイク使用時の音量 (70dB)
+  volumeNoMic: 65,          // マイク非使用時の音量 (65dB)
   logs: []
 };
 
@@ -168,7 +168,7 @@ function loadFromLocalStorage() {
   const savedVolumeMic = localStorage.getItem("signsound_volume_mic");
   if (savedVolumeMic !== null) {
     const val = parseFloat(savedVolumeMic);
-    state.volumeMic = val <= 1.0 ? 75 : val;
+    state.volumeMic = val <= 1.0 ? 70 : val;
   }
   const sliderMic = document.getElementById("volumeSliderMic");
   if (sliderMic) sliderMic.value = state.volumeMic;
@@ -176,7 +176,7 @@ function loadFromLocalStorage() {
   const savedVolumeNoMic = localStorage.getItem("signsound_volume_nomic");
   if (savedVolumeNoMic !== null) {
     const val = parseFloat(savedVolumeNoMic);
-    state.volumeNoMic = val <= 1.0 ? 70 : val;
+    state.volumeNoMic = val <= 1.0 ? 65 : val;
   }
   const sliderNoMic = document.getElementById("volumeSliderNoMic");
   if (sliderNoMic) sliderNoMic.value = state.volumeNoMic;
@@ -422,7 +422,7 @@ function renderScheduleGrid() {
       btnNoMic.style.borderRadius = "4px";
       btnNoMic.style.cursor = slotData.reserved ? "pointer" : "default";
       btnNoMic.style.transition = "all 0.2s";
-      btnNoMic.innerText = "🔇 非使用 (70dB)";
+      btnNoMic.innerText = "🔇 非使用 (65dB)";
       btnNoMic.disabled = !slotData.reserved;
       
       const btnMic = document.createElement("button");
@@ -436,7 +436,7 @@ function renderScheduleGrid() {
       btnMic.style.borderRadius = "4px";
       btnMic.style.cursor = slotData.reserved ? "pointer" : "default";
       btnMic.style.transition = "all 0.2s";
-      btnMic.innerText = "🎤 使用 (75dB)";
+      btnMic.innerText = "🎤 使用 (70dB)";
       btnMic.disabled = !slotData.reserved;
       
       // ボタンのスタイル更新
@@ -472,7 +472,7 @@ function renderScheduleGrid() {
         saveReservations();
         renderScheduleGrid();
         renderFloorMap();
-        addLog("sys", `【設定変更】${room} ${slot.name} の設定を「マイク非使用 (70dB)」にしました。`);
+        addLog("sys", `【設定変更】${room} ${slot.name} の設定を「マイク非使用 (65dB)」にしました。`);
       });
       
       btnMic.addEventListener("click", () => {
@@ -481,7 +481,7 @@ function renderScheduleGrid() {
         saveReservations();
         renderScheduleGrid();
         renderFloorMap();
-        addLog("sys", `【設定変更】${room} ${slot.name} の設定を「マイク使用 (75dB)」にしました。`);
+        addLog("sys", `【設定変更】${room} ${slot.name} の設定を「マイク使用 (70dB)」にしました。`);
       });
       
       btnContainer.appendChild(btnNoMic);
@@ -1148,11 +1148,11 @@ function updateCountdown() {
         if (c.useMic) {
           volBadge.style.background = "#ffebee";
           volBadge.style.color = "var(--status-reserved)";
-          volBadge.innerText = `🎤 75dB`;
+          volBadge.innerText = `🎤 70dB`;
         } else {
           volBadge.style.background = "#e8f5e9";
           volBadge.style.color = "var(--status-vacant)";
-          volBadge.innerText = `🔇 70dB`;
+          volBadge.innerText = `🔇 65dB`;
         }
         volBadge.style.fontWeight = "bold";
         badgeDiv.appendChild(volBadge);
@@ -1413,7 +1413,7 @@ function registerEventListeners() {
     renderFloorMap();
     
     const slotStr = TIME_SLOTS.find(s => s.id === currentMapSlot).name;
-    addLog("sys", `【案内図操作】${activePopoverRoom} ${slotStr} を「マイク非使用 (70dB)」に設定しました。`);
+    addLog("sys", `【案内図操作】${activePopoverRoom} ${slotStr} を「マイク非使用 (65dB)」に設定しました。`);
   });
 
   document.getElementById("popoverMicYes").addEventListener("click", () => {
@@ -1429,7 +1429,7 @@ function registerEventListeners() {
     renderFloorMap();
     
     const slotStr = TIME_SLOTS.find(s => s.id === currentMapSlot).name;
-    addLog("sys", `【案内図操作】${activePopoverRoom} ${slotStr} を「マイク使用 (75dB)」に設定しました。`);
+    addLog("sys", `【案内図操作】${activePopoverRoom} ${slotStr} を「マイク使用 (70dB)」に設定しました。`);
   });
 
   // ポップオーバー手動テスト再生
